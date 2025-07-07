@@ -1,35 +1,66 @@
-# ZK Guess Contracts
+## Foundry
 
-On-chain game logic where players prove their guesses without revealing the secret number.
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-## Contracts
+Foundry consists of:
 
-- `GuessGame.sol` - Main game logic
-- `GuessVerifier.sol` - Auto-generated Groth16 verifier (DO NOT EDIT)
+-   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+-   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+-   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+-   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-## Quick Start
+## Documentation
 
-```bash
-# Install dependencies
-forge install
+https://book.getfoundry.sh/
 
-# Run tests
-forge test
+## Usage
 
-# Run slow tests (generates real proofs)
-SLOW_TESTS=true forge test
+### Build
 
-# Deploy to Base testnet
-forge script script/Deploy.s.sol --rpc-url base-sepolia --broadcast
+```shell
+$ forge build
 ```
 
-## Game Flow
+### Test
 
-1. **Creator** commits to hidden number with bounty
-2. **Players** submit guesses with stakes  
-3. **Creator** proves guesses right/wrong via ZK
-4. **Winner** takes bounty + accumulated stakes
+```shell
+$ forge test
+```
 
-## License
+### Format
 
-MIT
+```shell
+$ forge fmt
+```
+
+### Gas Snapshots
+
+```shell
+$ forge snapshot
+```
+
+### Anvil
+
+```shell
+$ anvil
+```
+
+### Deploy
+
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+
+### Cast
+
+```shell
+$ cast <subcommand>
+```
+
+### Help
+
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```
