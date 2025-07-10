@@ -1,66 +1,72 @@
-## Foundry
+# ZK Guess Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Smart contracts for the ZK Guess number guessing game with on-chain Groth16 verification.
 
-Foundry consists of:
+## Overview
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+This repository contains the Solidity smart contracts that power the ZK Guess game:
 
-## Documentation
+- **[GuessGame.sol](src/GuessGame.sol)** - Main game logic contract
+- **[GuessVerifier.sol](src/GuessVerifier.sol)** - Auto-generated Groth16 verifier (DO NOT EDIT)
+- **[IGuessGame.sol](src/interfaces/IGuessGame.sol)** - Interface defining game structures and functions
 
-https://book.getfoundry.sh/
+## Setup
 
-## Usage
+```bash
+# Install dependencies
+forge install
 
-### Build
+# Run tests
+forge test
 
-```shell
-$ forge build
+# Run tests with gas reporting
+forge test --gas-report
 ```
 
-### Test
+## Deployment
 
-```shell
-$ forge test
+```bash
+# Deploy to local network
+forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+
+# Deploy to Base testnet
+forge script script/Deploy.s.sol --rpc-url $BASE_TESTNET_RPC --private-key $PRIVATE_KEY --broadcast --verify
 ```
 
-### Format
+## Testing
 
-```shell
-$ forge fmt
+The test suite includes:
+- Unit tests for core game mechanics
+- Access control tests
+- State transition tests
+
+To run specific test files:
+```bash
+forge test --match-path test/GuessGame.t.sol
 ```
 
-### Gas Snapshots
+## Architecture
 
-```shell
-$ forge snapshot
-```
+The GuessGame contract inherits from the auto-generated Groth16Verifier to efficiently verify ZK proofs on-chain. The game flow is:
 
-### Anvil
+1. Creator posts a puzzle with a commitment to a secret number
+2. Players submit guesses along with a stake
+3. Creator responds with a ZK proof showing if the guess is correct
+4. If correct: player wins bounty + all stakes
+5. If incorrect: player's stake is added to the bounty
 
-```shell
-$ anvil
-```
+## Important Notes
 
-### Deploy
+- **NEVER** manually edit `GuessVerifier.sol` - it's auto-generated from the circuits
+- Run `bun run copy-to-contracts` in the circuits repo to update the verifier
+- The verifier expects 2 public signals: `[commitment, isCorrect]`
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+## Gas Costs
 
-### Cast
+- Puzzle creation: ~172k gas
+- Guess submission: ~325k gas  
+- Proof verification: TBD (depends on actual proofs)
 
-```shell
-$ cast <subcommand>
-```
+## License
 
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+MIT
