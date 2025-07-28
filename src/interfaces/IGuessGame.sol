@@ -9,6 +9,7 @@ interface IGuessGame {
         uint256 stakeRequired;
         uint8 bountyGrowthPercent;
         uint256 totalStaked;
+        uint256 creatorReward;
         bool solved;
     }
     
@@ -35,6 +36,12 @@ interface IGuessGame {
     error InvalidProof();
     error ChallengeNotFound();
     error PuzzleNotFound();
+    error InvalidGrowthPercent();
+    error InvalidVerifierAddress();
+    error NothingToClaim();
+    error TransferToWinnerFailed();
+    error TransferToCreatorFailed();
+    error TransferToClaimerFailed();
     
     // Functions
     function createPuzzle(

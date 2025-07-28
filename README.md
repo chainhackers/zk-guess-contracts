@@ -25,12 +25,22 @@ forge test --gas-report
 
 ## Deployment
 
+First, set up your deployer keystore account:
 ```bash
-# Deploy to local network
-forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+# Import your private key (one-time setup)
+cast wallet import deployer --interactive
+```
 
-# Deploy to Base testnet
-forge script script/Deploy.s.sol --rpc-url $BASE_TESTNET_RPC --private-key $PRIVATE_KEY --broadcast --verify
+Then use the deployment scripts:
+```bash
+# Deploy to local Anvil
+./deploy-local.sh
+
+# Deploy to Base Sepolia (testnet)
+./deploy-sepolia.sh
+
+# Deploy to Base mainnet (requires confirmation)
+./deploy-mainnet.sh
 ```
 
 ## Testing
@@ -55,11 +65,20 @@ The GuessGame contract inherits from the auto-generated Groth16Verifier to effic
 4. If correct: player wins bounty + all stakes
 5. If incorrect: player's stake is added to the bounty
 
+## Contract Verification
+
+After deployment, verify your contract using Sourcify:
+
+```bash
+forge verify-contract --verifier sourcify --chain 8453 <CONTRACT_ADDRESS> GuessGame
+```
+
 ## Important Notes
 
-- **NEVER** manually edit `GuessVerifier.sol` - it's auto-generated from the circuits
+- **NEVER** manually edit `src/generated/GuessVerifier.sol` - it's auto-generated from the circuits
 - Run `bun run copy-to-contracts` in the circuits repo to update the verifier
 - The verifier expects 2 public signals: `[commitment, isCorrect]`
+- The build will show "unreachable code" warnings - these are expected due to the assembly code in the auto-generated verifier using early returns
 
 ## Gas Costs
 

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "./GuessVerifier.sol";
+import "./interfaces/IGroth16Verifier.sol";
 import "./interfaces/IGuessGame.sol";
 
-contract GuessGame is Groth16Verifier, IGuessGame {
+contract GuessGame is IGuessGame {
+    IGroth16Verifier public immutable verifier;
     uint256 public puzzleCount;
     uint256 public challengeCount;
     
@@ -14,13 +15,18 @@ contract GuessGame is Groth16Verifier, IGuessGame {
     
     uint256 constant MIN_BOUNTY = 0.001 ether;
     
+    constructor(address _verifier) {
+        if (_verifier == address(0)) revert InvalidVerifierAddress();
+        verifier = IGroth16Verifier(_verifier);
+    }
+    
     function createPuzzle(
         bytes32 commitment,
         uint256 stakeRequired,
         uint8 bountyGrowthPercent
     ) external payable returns (uint256 puzzleId) {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
-        if (bountyGrowthPercent > 100) revert("Invalid growth percent");
+        if (bountyGrowthPercent > 100) revert InvalidGrowthPercent();
         
         puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
@@ -30,6 +36,7 @@ contract GuessGame is Groth16Verifier, IGuessGame {
             stakeRequired: stakeRequired,
             bountyGrowthPercent: bountyGrowthPercent,
             totalStaked: 0,
+            creatorReward: 0,
             solved: false
         });
         
@@ -76,8 +83,8 @@ contract GuessGame is Groth16Verifier, IGuessGame {
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         
-        // Verify the proof
-        if (!verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
+        // Verify the proof using external verifier
+        if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
         
         // Extract public signals
         bytes32 commitment = bytes32(_pubSignals[0]);
@@ -90,26 +97,17 @@ contract GuessGame is Groth16Verifier, IGuessGame {
         emit ChallengeResponded(challengeId, isCorrect);
         
         if (isCorrect) {
-            // Puzzle solved! Winner gets bounty + all stakes
             puzzle.solved = true;
-            uint256 totalPrize = puzzle.bounty + puzzle.totalStaked;
             
+            uint256 totalPrize = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
             emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
             
-            // Transfer prize to winner
             (bool success, ) = challenge.guesser.call{value: totalPrize}("");
-            require(success, "Transfer failed");
+            if (!success) revert TransferToWinnerFailed();
         } else {
-            // Wrong guess - add stake to bounty
             uint256 stakeGrowth = (challenge.stake * puzzle.bountyGrowthPercent) / 100;
             puzzle.bounty += stakeGrowth;
-            
-            // Return remaining stake to creator
-            uint256 creatorShare = challenge.stake - stakeGrowth;
-            if (creatorShare > 0) {
-                (bool success, ) = puzzle.creator.call{value: creatorShare}("");
-                require(success, "Transfer failed");
-            }
+            puzzle.creatorReward += (challenge.stake - stakeGrowth);
         }
     }
     
@@ -119,5 +117,20 @@ contract GuessGame is Groth16Verifier, IGuessGame {
     
     function getChallenge(uint256 challengeId) external view returns (Challenge memory) {
         return challenges[challengeId];
+    }
+    
+    function closePuzzle(uint256 puzzleId) external {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
+        if (puzzle.solved) revert PuzzleAlreadySolved();
+        
+        uint256 totalAmount = puzzle.bounty + puzzle.totalStaked;
+        if (totalAmount == 0) revert NothingToClaim();
+        
+        // Delete puzzle to get gas refund
+        delete puzzles[puzzleId];
+        
+        (bool success, ) = msg.sender.call{value: totalAmount}("");
+        if (!success) revert TransferToClaimerFailed();
     }
 }

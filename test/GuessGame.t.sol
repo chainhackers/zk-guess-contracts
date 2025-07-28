@@ -3,17 +3,26 @@ pragma solidity ^0.8.30;
 
 import "forge-std/Test.sol";
 import "../src/GuessGame.sol";
+import "../src/generated/GuessVerifier.sol";
 
 contract GuessGameTest is Test {
+    Groth16Verifier public verifier;
     GuessGame public game;
     
-    address creator = address(0x1);
-    address guesser = address(0x2);
+    address creator;
+    address guesser;
     
     function setUp() public {
-        game = new GuessGame();
+        creator = makeAddr("creator");
+        guesser = makeAddr("guesser");
+        
         vm.deal(creator, 10 ether);
         vm.deal(guesser, 10 ether);
+        
+        // Deploy verifier first
+        verifier = new Groth16Verifier();
+        // Deploy game with verifier address
+        game = new GuessGame(address(verifier));
     }
     
     function test_CreatePuzzle() public {
@@ -85,12 +94,9 @@ contract GuessGameTest is Test {
     }
     
     function test_SubmitGuess_PuzzleNotFound() public {
-        vm.startPrank(guesser);
-        
+        vm.prank(guesser);
         vm.expectRevert(IGuessGame.PuzzleNotFound.selector);
         game.submitGuess{value: 0.01 ether}(999, 50);
-        
-        vm.stopPrank();
     }
     
     function test_SubmitGuess_InsufficientStake() public {
@@ -139,5 +145,39 @@ contract GuessGameTest is Test {
         game.respondToChallenge(challengeId, pA, pB, pC, pubSignals);
         
         vm.stopPrank();
+    }
+    
+    function test_ClosePuzzle_WithAccumulatedRewards() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            bytes32(uint256(1)),
+            0.01 ether,
+            50 // 50% growth
+        );
+        
+        // Submit two incorrect guesses
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        
+        address thirdGuesser = makeAddr("thirdGuesser");
+        vm.deal(thirdGuesser, 10 ether);
+        vm.prank(thirdGuesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+        
+        // Check creator balance before closing
+        uint256 creatorBalanceBefore = creator.balance;
+        
+        // Close puzzle as creator
+        vm.prank(creator);
+        game.closePuzzle(puzzleId);
+        
+        // Creator should receive initial bounty + all stakes
+        uint256 expectedAmount = 0.1 ether + 0.02 ether; // bounty + totalStaked
+        assertEq(creator.balance, creatorBalanceBefore + expectedAmount);
+        
+        // Verify puzzle is deleted
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.creator, address(0));
     }
 }
