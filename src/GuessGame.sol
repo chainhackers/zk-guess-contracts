@@ -50,6 +50,7 @@ contract GuessGame is IGuessGame {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
+        if (msg.sender == puzzle.creator) revert CannotGuessOwnPuzzle();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
         
         challengeId = challengeCount++;

@@ -33,6 +33,7 @@ interface IGuessGame {
     error PuzzleAlreadySolved();
     error ChallengeAlreadyResponded();
     error OnlyPuzzleCreator();
+    error CannotGuessOwnPuzzle();
     error InvalidProof();
     error ChallengeNotFound();
     error PuzzleNotFound();
