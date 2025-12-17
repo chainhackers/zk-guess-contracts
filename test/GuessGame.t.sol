@@ -115,7 +115,20 @@ contract GuessGameTest is Test {
         
         vm.stopPrank();
     }
-    
+
+    function test_SubmitGuess_CannotGuessOwnPuzzle() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            keccak256(abi.encodePacked(uint256(42), uint256(123))),
+            0.01 ether,
+            50
+        );
+
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.CannotGuessOwnPuzzle.selector);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+    }
+
     // Note: Testing respondToChallenge requires valid ZK proofs
     // which would be generated off-chain. For unit tests, we can
     // test the access control and state transitions with mock proofs
