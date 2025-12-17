@@ -13,107 +13,110 @@ import "../../src/generated/GuessVerifier.sol";
 contract GuessGameHandler is Test {
     GuessGame public immutable game;
     Groth16Verifier public immutable verifier;
-    
+
     // Ghost variables for tracking state
     mapping(uint256 => uint256) public ghostTotalStakes; // Track total stakes per puzzle
     mapping(uint256 => bool) public ghostPuzzleExists;
     mapping(uint256 => bool) public ghostPuzzleSolved;
     mapping(uint256 => uint256) public ghostPuzzleFunds; // bounty + totalStaked per puzzle
     uint256 public ghostTotalContractFunds;
-    
+
     // Actors
     address[] public creators;
     address[] public guessers;
-    
+
     // Bounds for fuzzing
     uint256 constant MIN_STAKE = 0.001 ether;
     uint256 constant MAX_STAKE = 1 ether;
     uint256 constant MIN_BOUNTY = 0.001 ether;
     uint256 constant MAX_BOUNTY = 10 ether;
     uint8 constant MAX_GROWTH_PERCENT = 100;
-    
+
     // Valid proofs for testing (from actual circuit)
-    uint[2] validProofA_correct = [
+    uint256[2] validProofA_correct = [
         5157887698177337623115911855277593515678867316837177621945040770006555507013,
         2906418579536343400716582440049667062559269406745718123049284811979351078961
     ];
-    uint[2][2] validProofB_correct = [
-        [14332055634374331006889483633092758827337849388827220354213364180982843452222,
-         19810903419040124121233668365857833379920314502394091870176177029284861054627],
-        [14914521979328201877060585819741683859740663954794671014405495630456970523413,
-         5932921202897788419271490057837377976593298755559539853566958258387675310919]
+    uint256[2][2] validProofB_correct = [
+        [
+            14332055634374331006889483633092758827337849388827220354213364180982843452222,
+            19810903419040124121233668365857833379920314502394091870176177029284861054627
+        ],
+        [
+            14914521979328201877060585819741683859740663954794671014405495630456970523413,
+            5932921202897788419271490057837377976593298755559539853566958258387675310919
+        ]
     ];
-    uint[2] validProofC_correct = [
+    uint256[2] validProofC_correct = [
         19225161834181317330543503779290557071354809366572782951390269839775729508986,
         2612633047517129916523257452953334712431527691991012490800657229613067565909
     ];
-    
-    uint[2] validProofA_incorrect = [
+
+    uint256[2] validProofA_incorrect = [
         9758308845527562880152000047576342898199622908603024910972559233417444022851,
         13422093807828339412230457774329866784975316828562739791130382143618778496264
     ];
-    uint[2][2] validProofB_incorrect = [
-        [9091300984639239739423744708847319435452500770118051644787336315262064631896,
-         2270884553819703540920998596410221495666419821064349332236675366442618568527],
-        [14277132759968817182426864918099654463588513402666202713843117479877941998171,
-         2239514721205042574478060827327107365740006011919760432858530138062064747403]
+    uint256[2][2] validProofB_incorrect = [
+        [
+            9091300984639239739423744708847319435452500770118051644787336315262064631896,
+            2270884553819703540920998596410221495666419821064349332236675366442618568527
+        ],
+        [
+            14277132759968817182426864918099654463588513402666202713843117479877941998171,
+            2239514721205042574478060827327107365740006011919760432858530138062064747403
+        ]
     ];
-    uint[2] validProofC_incorrect = [
+    uint256[2] validProofC_incorrect = [
         4604401960742347972625156994490312017011144396786495069487929528815195101025,
         10202941257821071730828470950370450429224326502691136785274183779399028461980
     ];
-    
+
     bytes32 constant COMMITMENT_42_123 = 0x1d869fb8246b6131377493aaaf1cc16a8284d4aedcb7277079df35d0d1d552d1;
-    
+
     constructor(GuessGame _game, Groth16Verifier _verifier) {
         game = _game;
         verifier = _verifier;
-        
+
         // Initialize actors
-        for (uint i = 0; i < 3; i++) {
+        for (uint256 i = 0; i < 3; i++) {
             creators.push(address(uint160(0x1000 + i)));
             guessers.push(address(uint160(0x2000 + i)));
         }
     }
-    
+
     // Modifiers to bound inputs
     modifier boundBounty(uint256 bounty) {
         bounty = bound(bounty, MIN_BOUNTY, MAX_BOUNTY);
         _;
     }
-    
+
     modifier boundStake(uint256 stake) {
         stake = bound(stake, MIN_STAKE, MAX_STAKE);
         _;
     }
-    
+
     modifier boundGrowthPercent(uint8 percent) {
         percent = uint8(bound(uint256(percent), 0, MAX_GROWTH_PERCENT));
         _;
     }
-    
+
     modifier useActor(address[] memory actors, uint256 actorSeed) {
         address actor = actors[actorSeed % actors.length];
         vm.startPrank(actor);
         _;
         vm.stopPrank();
     }
-    
+
     // Bound helper - override StdUtils
     function bound(uint256 x, uint256 min, uint256 max) internal pure override returns (uint256) {
         if (x < min) return min;
         if (x > max) return max;
         return x;
     }
-    
+
     // Handler functions
-    function createPuzzle(
-        uint256 bountyAmount,
-        uint256 stakeRequired,
-        uint8 growthPercent,
-        uint256 creatorSeed
-    ) 
-        public 
+    function createPuzzle(uint256 bountyAmount, uint256 stakeRequired, uint8 growthPercent, uint256 creatorSeed)
+        public
         boundBounty(bountyAmount)
         boundStake(stakeRequired)
         boundGrowthPercent(growthPercent)
@@ -121,12 +124,10 @@ contract GuessGameHandler is Test {
     {
         // Fund the creator
         vm.deal(creators[creatorSeed % creators.length], bountyAmount);
-        
-        try game.createPuzzle{value: bountyAmount}(
-            COMMITMENT_42_123,
-            stakeRequired,
-            growthPercent
-        ) returns (uint256 puzzleId) {
+
+        try game.createPuzzle{value: bountyAmount}(COMMITMENT_42_123, stakeRequired, growthPercent) returns (
+            uint256 puzzleId
+        ) {
             // Update ghost variables
             ghostPuzzleExists[puzzleId] = true;
             ghostPuzzleFunds[puzzleId] = bountyAmount;
@@ -135,22 +136,17 @@ contract GuessGameHandler is Test {
             // Ignore reverts
         }
     }
-    
-    function submitGuess(
-        uint256 puzzleId,
-        uint256 guess,
-        uint256 stakeAmount,
-        uint256 guesserSeed
-    )
+
+    function submitGuess(uint256 puzzleId, uint256 guess, uint256 stakeAmount, uint256 guesserSeed)
         public
         boundStake(stakeAmount)
         useActor(guessers, guesserSeed)
     {
         if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId]) return;
-        
+
         // Fund the guesser
         vm.deal(guessers[guesserSeed % guessers.length], stakeAmount);
-        
+
         try game.submitGuess{value: stakeAmount}(puzzleId, guess) returns (uint256) {
             // Update ghost variables
             ghostTotalStakes[puzzleId] += stakeAmount;
@@ -160,31 +156,24 @@ contract GuessGameHandler is Test {
             // Ignore reverts
         }
     }
-    
-    function respondToChallenge(
-        uint256 challengeId,
-        bool isCorrect,
-        uint256 creatorSeed
-    )
+
+    function respondToChallenge(uint256 challengeId, bool isCorrect, uint256 creatorSeed)
         public
         useActor(creators, creatorSeed)
     {
         // Get puzzle info
         try game.getChallenge(challengeId) returns (IGuessGame.Challenge memory challenge) {
             if (challenge.responded) return;
-            
+
             uint256 puzzleId = game.challengeToPuzzle(challengeId);
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-            
+
             if (puzzle.solved) return;
-            
-            uint[2] memory pubSignals = [
-                uint256(COMMITMENT_42_123),
-                isCorrect ? 1 : 0
-            ];
-            
+
+            uint256[2] memory pubSignals = [uint256(COMMITMENT_42_123), isCorrect ? 1 : 0];
+
             uint256 balanceBefore = address(game).balance;
-            
+
             try game.respondToChallenge(
                 challengeId,
                 isCorrect ? validProofA_correct : validProofA_incorrect,
@@ -199,7 +188,7 @@ contract GuessGameHandler is Test {
                     ghostTotalContractFunds -= distributed;
                     ghostPuzzleFunds[puzzleId] = 0;
                 }
-                
+
                 // Verify no ETH was created or destroyed
                 uint256 balanceAfter = address(game).balance;
                 assert(balanceBefore >= balanceAfter);
@@ -210,18 +199,15 @@ contract GuessGameHandler is Test {
             // Ignore if challenge doesn't exist
         }
     }
-    
-    function closePuzzle(uint256 puzzleId, uint256 creatorSeed)
-        public
-        useActor(creators, creatorSeed)
-    {
+
+    function closePuzzle(uint256 puzzleId, uint256 creatorSeed) public useActor(creators, creatorSeed) {
         if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId]) return;
-        
+
         try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
             if (puzzle.creator != creators[creatorSeed % creators.length]) return;
-            
+
             uint256 expectedPayout = puzzle.bounty + puzzle.totalStaked;
-            
+
             try game.closePuzzle(puzzleId) {
                 // Update ghost variables
                 ghostPuzzleFunds[puzzleId] = 0;
@@ -234,7 +220,7 @@ contract GuessGameHandler is Test {
             // Ignore
         }
     }
-    
+
     // Helper to sum all active puzzle funds
     function sumActivePuzzleFunds() public view returns (uint256 total) {
         uint256 puzzleCount = game.puzzleCount();
