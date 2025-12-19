@@ -37,6 +37,7 @@ contract GuessGame is IGuessGame {
             bountyGrowthPercent: bountyGrowthPercent,
             totalStaked: 0,
             creatorReward: 0,
+            lastChallengeId: 0,
             solved: false
         });
         
@@ -58,12 +59,14 @@ contract GuessGame is IGuessGame {
             guess: guess,
             stake: msg.value,
             timestamp: block.timestamp,
+            prevChallengeId: puzzle.lastChallengeId,
             responded: false
         });
         challengeToPuzzle[challengeId] = puzzleId;
         
         puzzle.totalStaked += msg.value;
-        
+        puzzle.lastChallengeId = challengeId;
+
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
     }
     
@@ -78,6 +81,10 @@ contract GuessGame is IGuessGame {
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
         
+        if (challenge.prevChallengeId != 0) {
+            if (!challenges[challenge.prevChallengeId].responded) revert InvalidChallengeResponseOrder();
+        }
+
         uint256 puzzleId = challengeToPuzzle[challengeId];
         Puzzle storage puzzle = puzzles[puzzleId];
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();

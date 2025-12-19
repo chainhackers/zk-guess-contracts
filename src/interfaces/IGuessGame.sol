@@ -10,6 +10,7 @@ interface IGuessGame {
         uint8 bountyGrowthPercent;
         uint256 totalStaked;
         uint256 creatorReward;
+        uint256 lastChallengeId;
         bool solved;
     }
     
@@ -18,6 +19,7 @@ interface IGuessGame {
         uint256 guess;
         uint256 stake;
         uint256 timestamp;
+        uint256 prevChallengeId;
         bool responded;
     }
     
@@ -42,6 +44,7 @@ interface IGuessGame {
     error TransferToWinnerFailed();
     error TransferToCreatorFailed();
     error TransferToClaimerFailed();
+    error InvalidChallengeResponseOrder();
     
     // Functions
     function createPuzzle(
