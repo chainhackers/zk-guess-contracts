@@ -348,4 +348,67 @@ contract GuessGameWithProofsTest is Test {
             validPubSignals_incorrect
         );
     }
+
+    function test_RespondToChallenge_InvalidChallengeResponseOrder() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            COMMITMENT_42_123,
+            0.01 ether,
+            50
+        );
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 7);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        vm.startPrank(creator);
+        vm.expectRevert(IGuessGame.InvalidChallengeResponseOrder.selector);
+        game.respondToChallenge(
+            challengeId2,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        vm.stopPrank();
+    }
+
+    function test_RespondToChallenge_ValidOrder() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            COMMITMENT_42_123,
+            0.01 ether,
+            50
+        );
+
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 7);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        vm.startPrank(creator);
+        
+        game.respondToChallenge(
+            challengeId1,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        assertTrue(game.getChallenge(challengeId1).responded);
+
+        game.respondToChallenge(
+            challengeId2,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        assertTrue(game.getChallenge(challengeId2).responded);
+
+        vm.stopPrank();
+    }
 }

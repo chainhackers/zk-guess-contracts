@@ -38,7 +38,7 @@ contract GuessGameTest is Test {
             bountyGrowthPercent
         );
         
-        assertEq(puzzleId, 0);
+        assertEq(puzzleId, 1);
         assertEq(game.puzzleCount(), 1);
         
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
@@ -77,7 +77,7 @@ contract GuessGameTest is Test {
         vm.startPrank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
         
-        assertEq(challengeId, 0);
+        assertEq(challengeId, 1);
         assertEq(game.challengeCount(), 1);
         
         IGuessGame.Challenge memory challenge = game.getChallenge(challengeId);

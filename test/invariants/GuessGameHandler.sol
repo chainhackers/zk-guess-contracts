@@ -238,7 +238,7 @@ contract GuessGameHandler is Test {
     // Helper to sum all active puzzle funds
     function sumActivePuzzleFunds() public view returns (uint256 total) {
         uint256 puzzleCount = game.puzzleCount();
-        for (uint256 i = 0; i < puzzleCount; i++) {
+        for (uint256 i = 1; i <= puzzleCount; i++) {
             if (ghostPuzzleExists[i] && !ghostPuzzleSolved[i]) {
                 IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
                 total += puzzle.bounty + puzzle.totalStaked;

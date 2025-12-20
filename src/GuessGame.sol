@@ -28,7 +28,7 @@ contract GuessGame is IGuessGame {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
         if (bountyGrowthPercent > 100) revert InvalidGrowthPercent();
         
-        puzzleId = puzzleCount++;
+        puzzleId = ++puzzleCount;
         puzzles[puzzleId] = Puzzle({
             creator: msg.sender,
             commitment: commitment,
@@ -53,7 +53,7 @@ contract GuessGame is IGuessGame {
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
         
-        challengeId = challengeCount++;
+        challengeId = ++challengeCount;
         challenges[challengeId] = Challenge({
             guesser: msg.sender,
             guess: guess,
