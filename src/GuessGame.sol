@@ -31,14 +31,14 @@ contract GuessGame is IGuessGame {
         puzzleId = ++puzzleCount;
         puzzles[puzzleId] = Puzzle({
             creator: msg.sender,
+            bountyGrowthPercent: bountyGrowthPercent,
+            solved: false,
             commitment: commitment,
             bounty: msg.value,
             stakeRequired: stakeRequired,
-            bountyGrowthPercent: bountyGrowthPercent,
             totalStaked: 0,
             creatorReward: 0,
-            lastChallengeId: 0,
-            solved: false
+            lastChallengeId: 0
         });
         
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
@@ -56,11 +56,11 @@ contract GuessGame is IGuessGame {
         challengeId = ++challengeCount;
         challenges[challengeId] = Challenge({
             guesser: msg.sender,
+            responded: false,
             guess: guess,
             stake: msg.value,
             timestamp: block.timestamp,
-            prevChallengeId: puzzle.lastChallengeId,
-            responded: false
+            prevChallengeId: puzzle.lastChallengeId
         });
         challengeToPuzzle[challengeId] = puzzleId;
         

@@ -4,23 +4,23 @@ pragma solidity ^0.8.30;
 interface IGuessGame {
     struct Puzzle {
         address creator;
+        uint8 bountyGrowthPercent;
+        bool solved;
         bytes32 commitment;
         uint256 bounty;
         uint256 stakeRequired;
-        uint8 bountyGrowthPercent;
         uint256 totalStaked;
         uint256 creatorReward;
         uint256 lastChallengeId;
-        bool solved;
     }
     
     struct Challenge {
         address guesser;
+        bool responded;
         uint256 guess;
         uint256 stake;
         uint256 timestamp;
         uint256 prevChallengeId;
-        bool responded;
     }
     
     // Events
