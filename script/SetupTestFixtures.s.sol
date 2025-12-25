@@ -87,48 +87,48 @@ contract SetupTestFixtures is Script {
     function addTestGuesses() internal {
         console.log("\n--- Adding Test Guesses ---");
         
-        // Guesses on Puzzle 0 (Easy starter) - stake required: 0.001 ether
+        // Guesses on Puzzle 1 (Easy starter) - stake required: 0.001 ether
         vm.startBroadcast(ACCOUNT_1);
-        guessGame.submitGuess{value: 0.001 ether}(0, 50);
+        guessGame.submitGuess{value: 0.001 ether}(1, 50);
         vm.stopBroadcast();
-        console.log("Account 1 guessed 50 on Puzzle #0");
+        console.log("Account 1 guessed 50 on Puzzle #1");
         
         vm.startBroadcast(ACCOUNT_2);
-        guessGame.submitGuess{value: 0.001 ether}(0, 35);
+        guessGame.submitGuess{value: 0.001 ether}(1, 35);
         vm.stopBroadcast();
-        console.log("Account 2 guessed 35 on Puzzle #0");
+        console.log("Account 2 guessed 35 on Puzzle #1");
         
         vm.startBroadcast(ACCOUNT_3);
-        guessGame.submitGuess{value: 0.001 ether}(0, 60);
+        guessGame.submitGuess{value: 0.001 ether}(1, 60);
         vm.stopBroadcast();
-        console.log("Account 3 guessed 60 on Puzzle #0");
+        console.log("Account 3 guessed 60 on Puzzle #1");
         
-        // Guesses on Puzzle 1 (High roller) - stake required: 0.01 ether
+        // Guesses on Puzzle 2 (High roller) - stake required: 0.01 ether
         vm.startBroadcast(ACCOUNT_0);
-        guessGame.submitGuess{value: 0.01 ether}(1, 80);
+        guessGame.submitGuess{value: 0.01 ether}(2, 80);
         vm.stopBroadcast();
-        console.log("Account 0 guessed 80 on Puzzle #1");
+        console.log("Account 0 guessed 80 on Puzzle #2");
         
         vm.startBroadcast(ACCOUNT_4);
-        guessGame.submitGuess{value: 0.01 ether}(1, 70);
+        guessGame.submitGuess{value: 0.01 ether}(2, 70);
         vm.stopBroadcast();
-        console.log("Account 4 guessed 70 on Puzzle #1");
+        console.log("Account 4 guessed 70 on Puzzle #2");
         
-        // Guess on Puzzle 2 (Lucky number) - stake required: 0.005 ether
+        // Guess on Puzzle 3 (Lucky number) - stake required: 0.005 ether
         vm.startBroadcast(ACCOUNT_1);
-        guessGame.submitGuess{value: 0.005 ether}(2, 10);
+        guessGame.submitGuess{value: 0.005 ether}(3, 10);
         vm.stopBroadcast();
-        console.log("Account 1 guessed 10 on Puzzle #2");
+        console.log("Account 1 guessed 10 on Puzzle #3");
         
-        // Free guesses on Puzzle 3 (Free play) - stake required: 0
+        // Free guesses on Puzzle 4 (Free play) - stake required: 0
         vm.startBroadcast(ACCOUNT_2);
-        guessGame.submitGuess{value: 0}(3, 90);
+        guessGame.submitGuess{value: 0}(4, 90);
         vm.stopBroadcast();
-        console.log("Account 2 guessed 90 on Puzzle #3 (free)");
+        console.log("Account 2 guessed 90 on Puzzle #4 (free)");
         
         vm.startBroadcast(ACCOUNT_1);
-        guessGame.submitGuess{value: 0}(3, 85);
+        guessGame.submitGuess{value: 0}(4, 85);
         vm.stopBroadcast();
-        console.log("Account 1 guessed 85 on Puzzle #3 (free)");
+        console.log("Account 1 guessed 85 on Puzzle #4 (free)");
     }
 }
