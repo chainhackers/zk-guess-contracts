@@ -34,6 +34,7 @@ interface IGuessGame {
     error ChallengeAlreadyResponded();
     error OnlyPuzzleCreator();
     error InvalidProof();
+    error InvalidProofForChallengeGuess();
     error ChallengeNotFound();
     error PuzzleNotFound();
     error InvalidGrowthPercent();
@@ -70,7 +71,7 @@ interface IGuessGame {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[2] calldata _pubSignals
+        uint[3] calldata _pubSignals
     ) external;
     
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
