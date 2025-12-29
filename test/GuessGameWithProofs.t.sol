@@ -351,4 +351,26 @@ contract GuessGameWithProofsTest is Test {
             validPubSignals_incorrect
         );
     }
+
+    function test_RespondToChallenge_InvalidProofForChallengeGuess() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            COMMITMENT_42_123,
+            0.01 ether,
+            50
+        );
+
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            challengeId,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+    }
 }
