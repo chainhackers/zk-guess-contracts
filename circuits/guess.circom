@@ -37,4 +37,4 @@ template GuessNumber() {
     isCorrect <== eq.out;
 }
 
-component main = GuessNumber();
+component main {public [guess]} = GuessNumber();

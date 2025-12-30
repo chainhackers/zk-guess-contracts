@@ -21,6 +21,6 @@ interface IGroth16Verifier {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint[2] calldata _pubSignals
+        uint[3] calldata _pubSignals
     ) external view returns (bool);
 }
