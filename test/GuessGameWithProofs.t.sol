@@ -59,6 +59,26 @@ contract GuessGameWithProofsTest is Test {
         50 //guess
     ];
     
+    uint[2] validProofA_incorrect_99 = [
+        1522250115459347886732366836753121648149166765464232477792700654355908098958,
+        12230247335391372868598697888961446586952358073485687489866514136177234102516
+    ];
+    uint[2][2] validProofB_incorrect_99 = [
+        [829808490343623106010157378861222277376158829827485398099043639305686191932,
+         17794992986969421673750416099231395431613517939633365877256108996901124885408],
+        [13764104074731906666379119009729886488089352881221577140560629738823728313757,
+         8228639052365462362835629439297935566254125449786065112616179334330818224187]
+    ];
+    uint[2] validProofC_incorrect_99 = [
+        1477156412658329873137803094926985163386885774473985262711014984933715457935,
+        13394207920715449173518714206562449218544155651180071706369101076169486617299
+    ];
+    uint[3] validPubSignals_incorrect_99 = [
+        uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
+        0, // isCorrect = false
+        99 //guess
+    ];
+
     function setUp() public {
         // Create test addresses that can receive ETH
         creator = makeAddr("creator");
@@ -186,15 +206,14 @@ contract GuessGameWithProofsTest is Test {
         // Second incorrect guess from different guesser
         vm.prank(guesser2);
         uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
-        
-        // For simplicity, reuse the same incorrect proof (in reality would be different)
+
         vm.prank(creator);
         game.respondToChallenge(
             challengeId2,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
         );
         
         IGuessGame.Puzzle memory puzzleAfterIncorrect = game.getPuzzle(puzzleId);
