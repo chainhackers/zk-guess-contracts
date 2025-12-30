@@ -382,14 +382,27 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
 
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
         game.respondToChallenge(
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
+        );
+
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            challengeId1,
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
         );
     }
 }
