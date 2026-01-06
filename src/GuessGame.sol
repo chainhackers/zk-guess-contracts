@@ -64,7 +64,7 @@ contract GuessGame is IGuessGame {
         });
         challengeToPuzzle[challengeId] = puzzleId;
         
-        puzzle.totalStaked += msg.value;
+        //puzzle.totalStaked += msg.value;
         puzzle.lastChallengeId = challengeId;
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
@@ -106,7 +106,7 @@ contract GuessGame is IGuessGame {
         if (isCorrect) {
             puzzle.solved = true;
             
-            uint256 totalPrize = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
+            uint256 totalPrize = puzzle.bounty + challenge.stake;
             emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
             
             (bool success, ) = challenge.guesser.call{value: totalPrize}("");
@@ -131,7 +131,7 @@ contract GuessGame is IGuessGame {
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         
-        uint256 totalAmount = puzzle.bounty + puzzle.totalStaked;
+        uint256 totalAmount = puzzle.bounty + puzzle.creatorReward;
         if (totalAmount == 0) revert NothingToClaim();
         
         // Delete puzzle to get gas refund
