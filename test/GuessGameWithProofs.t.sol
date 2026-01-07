@@ -88,7 +88,7 @@ contract GuessGameWithProofsTest is Test {
         
         // Check initial state
         IGuessGame.Puzzle memory puzzleBefore = game.getPuzzle(puzzleId);
-        assertEq(puzzleBefore.totalStaked, 0.01 ether);
+        assertEq(puzzleBefore.bounty, 0.1 ether);
         assertEq(puzzleBefore.solved, false);
         
         uint256 guesserBalanceBefore = guesser.balance;
@@ -197,13 +197,11 @@ contract GuessGameWithProofsTest is Test {
         
         IGuessGame.Puzzle memory puzzleAfterIncorrect = game.getPuzzle(puzzleId);
         assertEq(puzzleAfterIncorrect.bounty, 0.1 ether + 0.005 ether + 0.005 ether);
-        assertEq(puzzleAfterIncorrect.totalStaked, 0.02 ether);
         assertEq(puzzleAfterIncorrect.creatorReward, 0.005 ether + 0.005 ether);
         
         // Log state after incorrect guesses
         console.log("After incorrect guesses:");
         console.log("  Bounty:", puzzleAfterIncorrect.bounty);
-        console.log("  Total staked:", puzzleAfterIncorrect.totalStaked);
         console.log("  Creator reward:", puzzleAfterIncorrect.creatorReward);
         
         // Now submit correct guess
@@ -217,13 +215,13 @@ contract GuessGameWithProofsTest is Test {
         
         // Check expected payouts
         IGuessGame.Puzzle memory puzzleBeforeSolve = game.getPuzzle(puzzleId);
-        uint256 expectedWinnerPrize = puzzleBeforeSolve.bounty + puzzleBeforeSolve.totalStaked - puzzleBeforeSolve.creatorReward;
+        IGuessGame.Challenge memory challenge3 = game.getChallenge(challengeId3);
+        uint256 expectedWinnerPrize = puzzleBeforeSolve.bounty + challenge3.stake;
         uint256 expectedCreatorPayout = puzzleBeforeSolve.creatorReward;
         
         // Log values for debugging
         console.log("Before solving:");
         console.log("  Puzzle bounty:", puzzleBeforeSolve.bounty);
-        console.log("  Total staked:", puzzleBeforeSolve.totalStaked);
         console.log("  Creator reward:", puzzleBeforeSolve.creatorReward);
         console.log("Contract balance:", contractBalance);
         console.log("Expected winner prize:", expectedWinnerPrize);
@@ -347,5 +345,68 @@ contract GuessGameWithProofsTest is Test {
             validProofC_incorrect,
             validPubSignals_incorrect
         );
+    }
+
+    function test_RespondToChallenge_InvalidChallengeResponseOrder() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            COMMITMENT_42_123,
+            0.01 ether,
+            50
+        );
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 7);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        vm.startPrank(creator);
+        vm.expectRevert(IGuessGame.InvalidChallengeResponseOrder.selector);
+        game.respondToChallenge(
+            challengeId2,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        vm.stopPrank();
+    }
+
+    function test_RespondToChallenge_ValidOrder() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(
+            COMMITMENT_42_123,
+            0.01 ether,
+            50
+        );
+
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 7);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        vm.startPrank(creator);
+        
+        game.respondToChallenge(
+            challengeId1,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        assertTrue(game.getChallenge(challengeId1).responded);
+
+        game.respondToChallenge(
+            challengeId2,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+        assertTrue(game.getChallenge(challengeId2).responded);
+
+        vm.stopPrank();
     }
 }

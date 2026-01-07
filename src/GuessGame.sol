@@ -28,16 +28,16 @@ contract GuessGame is IGuessGame {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
         if (bountyGrowthPercent > 100) revert InvalidGrowthPercent();
         
-        puzzleId = puzzleCount++;
+        puzzleId = ++puzzleCount;
         puzzles[puzzleId] = Puzzle({
             creator: msg.sender,
+            bountyGrowthPercent: bountyGrowthPercent,
+            solved: false,
             commitment: commitment,
             bounty: msg.value,
             stakeRequired: stakeRequired,
-            bountyGrowthPercent: bountyGrowthPercent,
-            totalStaked: 0,
             creatorReward: 0,
-            solved: false
+            lastChallengeId: 0
         });
         
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
@@ -52,18 +52,19 @@ contract GuessGame is IGuessGame {
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
         
-        challengeId = challengeCount++;
+        challengeId = ++challengeCount;
         challenges[challengeId] = Challenge({
             guesser: msg.sender,
+            responded: false,
             guess: guess,
             stake: msg.value,
             timestamp: block.timestamp,
-            responded: false
+            prevChallengeId: puzzle.lastChallengeId
         });
         challengeToPuzzle[challengeId] = puzzleId;
         
-        puzzle.totalStaked += msg.value;
-        
+        puzzle.lastChallengeId = challengeId;
+
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
     }
     
@@ -78,6 +79,10 @@ contract GuessGame is IGuessGame {
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
         
+        if (challenge.prevChallengeId != 0) {
+            if (!challenges[challenge.prevChallengeId].responded) revert InvalidChallengeResponseOrder();
+        }
+
         uint256 puzzleId = challengeToPuzzle[challengeId];
         Puzzle storage puzzle = puzzles[puzzleId];
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
@@ -99,7 +104,7 @@ contract GuessGame is IGuessGame {
         if (isCorrect) {
             puzzle.solved = true;
             
-            uint256 totalPrize = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
+            uint256 totalPrize = puzzle.bounty + challenge.stake;
             emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
             
             (bool success, ) = challenge.guesser.call{value: totalPrize}("");
@@ -124,7 +129,7 @@ contract GuessGame is IGuessGame {
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         
-        uint256 totalAmount = puzzle.bounty + puzzle.totalStaked;
+        uint256 totalAmount = puzzle.bounty + puzzle.creatorReward;
         if (totalAmount == 0) revert NothingToClaim();
         
         // Delete puzzle to get gas refund

@@ -4,21 +4,22 @@ pragma solidity ^0.8.30;
 interface IGuessGame {
     struct Puzzle {
         address creator;
+        uint8 bountyGrowthPercent;
+        bool solved;
         bytes32 commitment;
         uint256 bounty;
         uint256 stakeRequired;
-        uint8 bountyGrowthPercent;
-        uint256 totalStaked;
         uint256 creatorReward;
-        bool solved;
+        uint256 lastChallengeId;
     }
     
     struct Challenge {
         address guesser;
+        bool responded;
         uint256 guess;
         uint256 stake;
         uint256 timestamp;
-        bool responded;
+        uint256 prevChallengeId;
     }
     
     // Events
@@ -42,6 +43,7 @@ interface IGuessGame {
     error TransferToWinnerFailed();
     error TransferToCreatorFailed();
     error TransferToClaimerFailed();
+    error InvalidChallengeResponseOrder();
     
     // Functions
     function createPuzzle(
