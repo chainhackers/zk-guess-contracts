@@ -15,10 +15,9 @@ contract GuessGameHandler is Test {
     Groth16Verifier public immutable verifier;
     
     // Ghost variables for tracking state
-    mapping(uint256 => uint256) public ghostTotalStakes; // Track total stakes per puzzle
     mapping(uint256 => bool) public ghostPuzzleExists;
     mapping(uint256 => bool) public ghostPuzzleSolved;
-    mapping(uint256 => uint256) public ghostPuzzleFunds; // bounty + totalStaked per puzzle
+    mapping(uint256 => uint256) public ghostPuzzleFunds; // bounty + creatorReward per puzzle
     uint256 public ghostTotalContractFunds;
     
     // Actors
@@ -153,8 +152,6 @@ contract GuessGameHandler is Test {
         
         try game.submitGuess{value: stakeAmount}(puzzleId, guess) returns (uint256) {
             // Update ghost variables
-            ghostTotalStakes[puzzleId] += stakeAmount;
-            ghostPuzzleFunds[puzzleId] += stakeAmount;
             ghostTotalContractFunds += stakeAmount;
         } catch {
             // Ignore reverts
@@ -193,13 +190,14 @@ contract GuessGameHandler is Test {
                 pubSignals
             ) {
                 if (isCorrect) {
-                    // Puzzle solved - funds distributed
                     ghostPuzzleSolved[puzzleId] = true;
-                    uint256 distributed = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
+                    uint256 distributed = puzzle.bounty + challenge.stake;
                     ghostTotalContractFunds -= distributed;
-                    ghostPuzzleFunds[puzzleId] = 0;
+                    ghostPuzzleFunds[puzzleId] = puzzle.creatorReward;
+                } else {
+                    ghostPuzzleFunds[puzzleId] += challenge.stake;
                 }
-                
+
                 // Verify no ETH was created or destroyed
                 uint256 balanceAfter = address(game).balance;
                 assert(balanceBefore >= balanceAfter);
@@ -219,9 +217,9 @@ contract GuessGameHandler is Test {
         
         try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
             if (puzzle.creator != creators[creatorSeed % creators.length]) return;
-            
-            uint256 expectedPayout = puzzle.bounty + puzzle.totalStaked;
-            
+
+            uint256 expectedPayout = puzzle.bounty + puzzle.creatorReward;
+
             try game.closePuzzle(puzzleId) {
                 // Update ghost variables
                 ghostPuzzleFunds[puzzleId] = 0;
@@ -235,13 +233,23 @@ contract GuessGameHandler is Test {
         }
     }
     
-    // Helper to sum all active puzzle funds
-    function sumActivePuzzleFunds() public view returns (uint256 total) {
+    // Helper to sum all contract funds
+    function sumTotalContractFunds() public view returns (uint256 total) {
         uint256 puzzleCount = game.puzzleCount();
         for (uint256 i = 1; i <= puzzleCount; i++) {
             if (ghostPuzzleExists[i] && !ghostPuzzleSolved[i]) {
                 IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
-                total += puzzle.bounty + puzzle.totalStaked;
+                total += puzzle.bounty + puzzle.creatorReward;
+            }
+        }
+
+        uint256 challengeCount = game.challengeCount();
+
+        for (uint256 i = 1; i <= challengeCount; i++) {
+            IGuessGame.Challenge memory challenge = game.getChallenge(i);
+
+            if (!challenge.responded) {
+                total += challenge.stake;
             }
         }
     }

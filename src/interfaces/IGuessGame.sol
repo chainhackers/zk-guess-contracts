@@ -9,7 +9,6 @@ interface IGuessGame {
         bytes32 commitment;
         uint256 bounty;
         uint256 stakeRequired;
-        uint256 totalStaked;
         uint256 creatorReward;
         uint256 lastChallengeId;
     }

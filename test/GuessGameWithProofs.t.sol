@@ -88,7 +88,7 @@ contract GuessGameWithProofsTest is Test {
         
         // Check initial state
         IGuessGame.Puzzle memory puzzleBefore = game.getPuzzle(puzzleId);
-        assertEq(puzzleBefore.totalStaked, 0.01 ether);
+        assertEq(puzzleBefore.bounty, 0.1 ether);
         assertEq(puzzleBefore.solved, false);
         
         uint256 guesserBalanceBefore = guesser.balance;
@@ -197,13 +197,11 @@ contract GuessGameWithProofsTest is Test {
         
         IGuessGame.Puzzle memory puzzleAfterIncorrect = game.getPuzzle(puzzleId);
         assertEq(puzzleAfterIncorrect.bounty, 0.1 ether + 0.005 ether + 0.005 ether);
-        assertEq(puzzleAfterIncorrect.totalStaked, 0.02 ether);
         assertEq(puzzleAfterIncorrect.creatorReward, 0.005 ether + 0.005 ether);
         
         // Log state after incorrect guesses
         console.log("After incorrect guesses:");
         console.log("  Bounty:", puzzleAfterIncorrect.bounty);
-        console.log("  Total staked:", puzzleAfterIncorrect.totalStaked);
         console.log("  Creator reward:", puzzleAfterIncorrect.creatorReward);
         
         // Now submit correct guess
@@ -217,13 +215,13 @@ contract GuessGameWithProofsTest is Test {
         
         // Check expected payouts
         IGuessGame.Puzzle memory puzzleBeforeSolve = game.getPuzzle(puzzleId);
-        uint256 expectedWinnerPrize = puzzleBeforeSolve.bounty + puzzleBeforeSolve.totalStaked - puzzleBeforeSolve.creatorReward;
+        IGuessGame.Challenge memory challenge3 = game.getChallenge(challengeId3);
+        uint256 expectedWinnerPrize = puzzleBeforeSolve.bounty + challenge3.stake;
         uint256 expectedCreatorPayout = puzzleBeforeSolve.creatorReward;
         
         // Log values for debugging
         console.log("Before solving:");
         console.log("  Puzzle bounty:", puzzleBeforeSolve.bounty);
-        console.log("  Total staked:", puzzleBeforeSolve.totalStaked);
         console.log("  Creator reward:", puzzleBeforeSolve.creatorReward);
         console.log("Contract balance:", contractBalance);
         console.log("Expected winner prize:", expectedWinnerPrize);

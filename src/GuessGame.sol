@@ -36,7 +36,6 @@ contract GuessGame is IGuessGame {
             commitment: commitment,
             bounty: msg.value,
             stakeRequired: stakeRequired,
-            totalStaked: 0,
             creatorReward: 0,
             lastChallengeId: 0
         });
@@ -64,7 +63,6 @@ contract GuessGame is IGuessGame {
         });
         challengeToPuzzle[challengeId] = puzzleId;
         
-        //puzzle.totalStaked += msg.value;
         puzzle.lastChallengeId = challengeId;
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);

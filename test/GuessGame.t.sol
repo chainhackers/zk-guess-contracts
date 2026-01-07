@@ -47,7 +47,6 @@ contract GuessGameTest is Test {
         assertEq(puzzle.bounty, 0.1 ether);
         assertEq(puzzle.stakeRequired, stakeRequired);
         assertEq(puzzle.bountyGrowthPercent, bountyGrowthPercent);
-        assertEq(puzzle.totalStaked, 0);
         assertEq(puzzle.solved, false);
         
         vm.stopPrank();
@@ -85,11 +84,7 @@ contract GuessGameTest is Test {
         assertEq(challenge.guess, 50);
         assertEq(challenge.stake, 0.01 ether);
         assertEq(challenge.responded, false);
-        
-        // Check puzzle was updated
-        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-        assertEq(puzzle.totalStaked, 0.01 ether);
-        
+
         vm.stopPrank();
     }
     
@@ -167,17 +162,19 @@ contract GuessGameTest is Test {
         
         // Check creator balance before closing
         uint256 creatorBalanceBefore = creator.balance;
-        
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        uint256 expectedAmount = puzzle.bounty + puzzle.creatorReward;
+
         // Close puzzle as creator
         vm.prank(creator);
         game.closePuzzle(puzzleId);
         
-        // Creator should receive initial bounty + all stakes
-        uint256 expectedAmount = 0.1 ether + 0.02 ether; // bounty + totalStaked
+        // Creator should receive bounty + creatorReward
         assertEq(creator.balance, creatorBalanceBefore + expectedAmount);
         
         // Verify puzzle is deleted
-        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-        assertEq(puzzle.creator, address(0));
+        IGuessGame.Puzzle memory deletedPuzzle = game.getPuzzle(puzzleId);
+        assertEq(deletedPuzzle.creator, address(0));
     }
 }
