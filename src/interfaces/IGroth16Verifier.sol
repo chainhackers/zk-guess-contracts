@@ -11,16 +11,16 @@ interface IGroth16Verifier {
     /**
      * @notice Verifies a Groth16 proof
      * @param _pA Point A of the proof
-     * @param _pB Point B of the proof  
+     * @param _pB Point B of the proof
      * @param _pC Point C of the proof
      * @param _pubSignals Public signals (inputs) to verify
      * @return bool True if the proof is valid, false otherwise
      * @dev This is a view function, allowing free off-chain verification
      */
     function verifyProof(
-        uint[2] calldata _pA,
-        uint[2][2] calldata _pB,
-        uint[2] calldata _pC,
-        uint[2] calldata _pubSignals
+        uint256[2] calldata _pA,
+        uint256[2][2] calldata _pB,
+        uint256[2] calldata _pC,
+        uint256[2] calldata _pubSignals
     ) external view returns (bool);
 }
