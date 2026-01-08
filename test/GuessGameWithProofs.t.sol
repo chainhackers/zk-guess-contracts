@@ -96,6 +96,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with valid proof showing guess is correct
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId,
             validProofA_correct,
             validProofB_correct,
@@ -108,7 +109,7 @@ contract GuessGameWithProofsTest is Test {
         assertEq(puzzleAfter.solved, true);
         
         // Verify challenge is marked as responded
-        IGuessGame.Challenge memory challenge = game.getChallenge(challengeId);
+        IGuessGame.Challenge memory challenge = game.getChallenge(puzzleId, challengeId);
         assertEq(challenge.responded, true);
         
         // Verify winner received bounty + stake
@@ -138,6 +139,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with valid proof showing guess is incorrect
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -174,6 +176,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond to first guess (incorrect)
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId1,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -188,6 +191,7 @@ contract GuessGameWithProofsTest is Test {
         // For simplicity, reuse the same incorrect proof (in reality would be different)
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId2,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -215,7 +219,7 @@ contract GuessGameWithProofsTest is Test {
         
         // Check expected payouts
         IGuessGame.Puzzle memory puzzleBeforeSolve = game.getPuzzle(puzzleId);
-        IGuessGame.Challenge memory challenge3 = game.getChallenge(challengeId3);
+        IGuessGame.Challenge memory challenge3 = game.getChallenge(puzzleId, challengeId3);
         uint256 expectedWinnerPrize = puzzleBeforeSolve.bounty + challenge3.stake;
         uint256 expectedCreatorPayout = puzzleBeforeSolve.creatorReward;
         
@@ -231,6 +235,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with correct proof
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId3,
             validProofA_correct,
             validProofB_correct,
@@ -266,6 +271,7 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProof.selector);
         game.respondToChallenge(
+            puzzleId,
             challengeId,
             validProofA_correct,
             validProofB_correct,
@@ -289,6 +295,7 @@ contract GuessGameWithProofsTest is Test {
         // First response
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -300,6 +307,7 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.ChallengeAlreadyResponded.selector);
         game.respondToChallenge(
+            puzzleId,
             challengeId,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -328,6 +336,7 @@ contract GuessGameWithProofsTest is Test {
         // Solve puzzle with first guess
         vm.prank(creator);
         game.respondToChallenge(
+            puzzleId,
             challengeId1,
             validProofA_correct,
             validProofB_correct,
@@ -339,6 +348,7 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.PuzzleAlreadySolved.selector);
         game.respondToChallenge(
+            puzzleId,
             challengeId2,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -364,6 +374,7 @@ contract GuessGameWithProofsTest is Test {
         vm.startPrank(creator);
         vm.expectRevert(IGuessGame.InvalidChallengeResponseOrder.selector);
         game.respondToChallenge(
+            puzzleId,
             challengeId2,
             validProofA_incorrect,
             validProofB_incorrect,
@@ -390,22 +401,24 @@ contract GuessGameWithProofsTest is Test {
         vm.startPrank(creator);
         
         game.respondToChallenge(
+            puzzleId,
             challengeId1,
             validProofA_incorrect,
             validProofB_incorrect,
             validProofC_incorrect,
             validPubSignals_incorrect
         );
-        assertTrue(game.getChallenge(challengeId1).responded);
+        assertTrue(game.getChallenge(puzzleId, challengeId1).responded);
 
         game.respondToChallenge(
+            puzzleId,
             challengeId2,
             validProofA_incorrect,
             validProofB_incorrect,
             validProofC_incorrect,
             validPubSignals_incorrect
         );
-        assertTrue(game.getChallenge(challengeId2).responded);
+        assertTrue(game.getChallenge(puzzleId, challengeId2).responded);
 
         vm.stopPrank();
     }

@@ -10,7 +10,7 @@ interface IGuessGame {
         uint256 bounty;
         uint256 stakeRequired;
         uint256 creatorReward;
-        uint256 lastChallengeId;
+        uint256 challengeCount;
     }
     
     struct Challenge {
@@ -19,7 +19,6 @@ interface IGuessGame {
         uint256 guess;
         uint256 stake;
         uint256 timestamp;
-        uint256 prevChallengeId;
     }
     
     // Events
@@ -68,6 +67,7 @@ interface IGuessGame {
      *      If incorrect: guesser loses stake, which is added to bounty
      */
     function respondToChallenge(
+        uint256 puzzleId,
         uint256 challengeId,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
@@ -76,7 +76,6 @@ interface IGuessGame {
     ) external;
     
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
-    function getChallenge(uint256 challengeId) external view returns (Challenge memory);
+    function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory);
     function puzzleCount() external view returns (uint256);
-    function challengeCount() external view returns (uint256);
 }

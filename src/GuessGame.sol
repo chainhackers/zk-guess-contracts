@@ -7,11 +7,9 @@ import "./interfaces/IGuessGame.sol";
 contract GuessGame is IGuessGame {
     IGroth16Verifier public immutable verifier;
     uint256 public puzzleCount;
-    uint256 public challengeCount;
     
     mapping(uint256 => Puzzle) public puzzles;
-    mapping(uint256 => Challenge) public challenges;
-    mapping(uint256 => uint256) public challengeToPuzzle;
+    mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
     
     uint256 constant MIN_BOUNTY = 0.001 ether;
     
@@ -28,7 +26,7 @@ contract GuessGame is IGuessGame {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
         if (bountyGrowthPercent > 100) revert InvalidGrowthPercent();
         
-        puzzleId = ++puzzleCount;
+        puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
             creator: msg.sender,
             bountyGrowthPercent: bountyGrowthPercent,
@@ -37,7 +35,7 @@ contract GuessGame is IGuessGame {
             bounty: msg.value,
             stakeRequired: stakeRequired,
             creatorReward: 0,
-            lastChallengeId: 0
+            challengeCount: 0
         });
         
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
@@ -52,41 +50,38 @@ contract GuessGame is IGuessGame {
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
         
-        challengeId = ++challengeCount;
-        challenges[challengeId] = Challenge({
+        challengeId = puzzle.challengeCount++;
+        puzzleChallenges[puzzleId][challengeId] = Challenge({
             guesser: msg.sender,
             responded: false,
             guess: guess,
             stake: msg.value,
-            timestamp: block.timestamp,
-            prevChallengeId: puzzle.lastChallengeId
+            timestamp: block.timestamp
         });
-        challengeToPuzzle[challengeId] = puzzleId;
-        
-        puzzle.lastChallengeId = challengeId;
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
     }
     
     function respondToChallenge(
+        uint256 puzzleId,
         uint256 challengeId,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
         uint[2] calldata _pubSignals
     ) external {
-        Challenge storage challenge = challenges[challengeId];
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
+        if (puzzle.solved) revert PuzzleAlreadySolved();
+
+        Challenge storage challenge = puzzleChallenges[puzzleId][challengeId];
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
         
-        if (challenge.prevChallengeId != 0) {
-            if (!challenges[challenge.prevChallengeId].responded) revert InvalidChallengeResponseOrder();
+        if (challengeId != 0) {
+            if (!puzzleChallenges[puzzleId][challengeId - 1].responded) revert InvalidChallengeResponseOrder();
         }
-
-        uint256 puzzleId = challengeToPuzzle[challengeId];
-        Puzzle storage puzzle = puzzles[puzzleId];
-        if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
-        if (puzzle.solved) revert PuzzleAlreadySolved();
         
         // Verify the proof using external verifier
         if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
@@ -120,8 +115,8 @@ contract GuessGame is IGuessGame {
         return puzzles[puzzleId];
     }
     
-    function getChallenge(uint256 challengeId) external view returns (Challenge memory) {
-        return challenges[challengeId];
+    function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory) {
+        return puzzleChallenges[puzzleId][challengeId];
     }
     
     function closePuzzle(uint256 puzzleId) external {

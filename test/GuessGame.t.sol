@@ -76,10 +76,10 @@ contract GuessGameTest is Test {
         vm.startPrank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
         
-        assertEq(challengeId, 1);
-        assertEq(game.challengeCount(), 1);
+        assertEq(challengeId, 1);                                                                                            
+        assertEq(game.getPuzzle(puzzleId).challengeCount, 1);
         
-        IGuessGame.Challenge memory challenge = game.getChallenge(challengeId);
+        IGuessGame.Challenge memory challenge = game.getChallenge(puzzleId, challengeId);
         assertEq(challenge.guesser, guesser);
         assertEq(challenge.guess, 50);
         assertEq(challenge.stake, 0.01 ether);
@@ -137,7 +137,7 @@ contract GuessGameTest is Test {
         uint[2] memory pubSignals = [uint(0), uint(0)];
         
         vm.expectRevert(IGuessGame.OnlyPuzzleCreator.selector);
-        game.respondToChallenge(challengeId, pA, pB, pC, pubSignals);
+        game.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);
         
         vm.stopPrank();
     }
