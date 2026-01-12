@@ -41,16 +41,15 @@ contract GuessGameInvariants is Test {
     }
     
     /**
-     * @notice Contract balance should always equal sum of all active puzzles' funds
+     * @notice Contract balance should always equal ghostTotalContractFunds
      */
     function invariant_contractBalanceMatchesTotalFunds() public view {
         uint256 contractBalance = address(game).balance;
-        uint256 expectedBalance = handler.sumTotalContractFunds();
         
         assertEq(
             contractBalance,
-            expectedBalance,
-            "Contract balance doesn't match sum of puzzle funds"
+            handler.ghostTotalContractFunds(),
+            "Contract balance doesn't match ghostTotalContractFunds"
         );
     }
     
@@ -59,23 +58,23 @@ contract GuessGameInvariants is Test {
      */
     function invariant_monotonicIds() public view {
         uint256 puzzleCount = game.puzzleCount();
-        uint256 challengeCount = game.challengeCount();
         
         // Check each puzzle ID exists in sequence
-        for (uint256 i = 1; i <= puzzleCount; i++) {
+        for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             // If puzzle was deleted, creator should be address(0)
             // Otherwise, it should have valid data
             if (puzzle.creator != address(0)) {
                 assert(puzzle.bounty >= 0.001 ether);
             }
-        }
-        
-        // Check each challenge ID exists in sequence
-        for (uint256 i = 1; i <= challengeCount; i++) {
-            IGuessGame.Challenge memory challenge = game.getChallenge(i);
-            // All challenges should have a guesser (never deleted)
-            assert(challenge.guesser != address(0));
+
+            // Check each challenge ID exists in sequence
+            uint256 challengeCount = handler.ghostPuzzleChallengeCount(i);
+            for (uint256 challengeId = 0; challengeId < challengeCount; challengeId++) {
+                IGuessGame.Challenge memory challenge = game.getChallenge(i, challengeId);
+                // All challenges should have a guesser (never deleted)
+                assert(challenge.guesser != address(0));
+            }
         }
     }
     
@@ -85,7 +84,7 @@ contract GuessGameInvariants is Test {
     function invariant_solvedPuzzlesImmutable() public view {
         uint256 puzzleCount = game.puzzleCount();
         
-        for (uint256 i = 1; i <= puzzleCount; i++) {
+        for (uint256 i = 0; i < puzzleCount; i++) {
             if (handler.ghostPuzzleSolved(i)) {
                 IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
                 assert(puzzle.solved == true);
@@ -97,18 +96,16 @@ contract GuessGameInvariants is Test {
      * @notice Challenge responses should be immutable
      */
     function invariant_challengeResponsesImmutable() public view {
-        uint256 challengeCount = game.challengeCount();
-        
-        for (uint256 i = 1; i <= challengeCount; i++) {
-            IGuessGame.Challenge memory challenge = game.getChallenge(i);
-            // Check consistency with puzzle state
-            uint256 puzzleId = game.challengeToPuzzle(i);
-            IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-            
-            // If puzzle is solved, at least one challenge must be responded with correct guess
-            if (puzzle.solved && challenge.responded) {
-                // This challenge might be the winning one
-                assert(challenge.guesser != address(0));
+        uint256 puzzleCount = game.puzzleCount();
+
+        for (uint256 puzzleId = 0; puzzleId < puzzleCount; puzzleId++) {
+            uint256 challengeCount = handler.ghostPuzzleChallengeCount(puzzleId);
+
+            for (uint256 challengeId = 0; challengeId < challengeCount; challengeId++) {
+                if (handler.ghostChallengeResponded(puzzleId, challengeId)) {
+                    IGuessGame.Challenge memory challenge = game.getChallenge(puzzleId, challengeId);
+                    assert(challenge.responded == true);
+                }
             }
         }
     }
@@ -119,7 +116,7 @@ contract GuessGameInvariants is Test {
     function invariant_growthPercentBounds() public view {
         uint256 puzzleCount = game.puzzleCount();
         
-        for (uint256 i = 1; i <= puzzleCount; i++) {
+        for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             if (puzzle.creator != address(0)) {
                 assert(puzzle.bountyGrowthPercent <= 100);
@@ -133,7 +130,7 @@ contract GuessGameInvariants is Test {
     function invariant_minimumBounty() public view {
         uint256 puzzleCount = game.puzzleCount();
         
-        for (uint256 i = 1; i <= puzzleCount; i++) {
+        for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             if (puzzle.creator != address(0)) {
                 assert(puzzle.bounty >= 0.001 ether);
@@ -147,24 +144,20 @@ contract GuessGameInvariants is Test {
     function invariant_creatorRewardAccounting() public view {
         uint256 puzzleCount = game.puzzleCount();
         
-        for (uint256 puzzleId = 1; puzzleId <= puzzleCount; puzzleId++) {
+        for (uint256 puzzleId = 0; puzzleId < puzzleCount; puzzleId++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
             if (puzzle.creator == address(0) || puzzle.solved) continue;
             
             // Calculate expected creator reward from incorrect guesses
             uint256 expectedCreatorReward = 0;
-            uint256 expectedBountyGrowth = 0;
-            uint256 challengeCount = game.challengeCount();
+            uint256 challengeCount = handler.ghostPuzzleChallengeCount(puzzleId);
             
-            for (uint256 challengeId = 1; challengeId <= challengeCount; challengeId++) {
-                if (game.challengeToPuzzle(challengeId) == puzzleId) {
-                    IGuessGame.Challenge memory challenge = game.getChallenge(challengeId);
-                    if (challenge.responded && !puzzle.solved) {
-                        // This was an incorrect guess
-                        uint256 stakeGrowth = (challenge.stake * puzzle.bountyGrowthPercent) / 100;
-                        expectedBountyGrowth += stakeGrowth;
-                        expectedCreatorReward += (challenge.stake - stakeGrowth);
-                    }
+            for (uint256 challengeId = 0; challengeId < challengeCount; challengeId++) {
+                IGuessGame.Challenge memory challenge = game.getChallenge(puzzleId, challengeId);
+                if (challenge.responded) {
+                    // This was an incorrect guess
+                    uint256 stakeGrowth = (challenge.stake * puzzle.bountyGrowthPercent) / 100;
+                    expectedCreatorReward += (challenge.stake - stakeGrowth);
                 }
             }
 

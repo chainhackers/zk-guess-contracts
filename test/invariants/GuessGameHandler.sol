@@ -19,6 +19,8 @@ contract GuessGameHandler is Test {
     mapping(uint256 => bool) public ghostPuzzleSolved;
     mapping(uint256 => uint256) public ghostPuzzleFunds; // bounty + creatorReward per puzzle
     uint256 public ghostTotalContractFunds;
+    mapping(uint256 => uint256) public ghostPuzzleChallengeCount;
+    mapping(uint256 => mapping(uint256 => bool)) public ghostChallengeResponded;
     
     // Actors
     address[] public creators;
@@ -153,12 +155,14 @@ contract GuessGameHandler is Test {
         try game.submitGuess{value: stakeAmount}(puzzleId, guess) returns (uint256) {
             // Update ghost variables
             ghostTotalContractFunds += stakeAmount;
+            ghostPuzzleChallengeCount[puzzleId]++;
         } catch {
             // Ignore reverts
         }
     }
     
     function respondToChallenge(
+        uint256 puzzleId,
         uint256 challengeId,
         bool isCorrect,
         uint256 creatorSeed
@@ -167,10 +171,9 @@ contract GuessGameHandler is Test {
         useActor(creators, creatorSeed)
     {
         // Get puzzle info
-        try game.getChallenge(challengeId) returns (IGuessGame.Challenge memory challenge) {
+        try game.getChallenge(puzzleId, challengeId) returns (IGuessGame.Challenge memory challenge) {
             if (challenge.responded) return;
             
-            uint256 puzzleId = game.challengeToPuzzle(challengeId);
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
             
             if (puzzle.solved) return;
@@ -183,12 +186,15 @@ contract GuessGameHandler is Test {
             uint256 balanceBefore = address(game).balance;
             
             try game.respondToChallenge(
+                puzzleId,
                 challengeId,
                 isCorrect ? validProofA_correct : validProofA_incorrect,
                 isCorrect ? validProofB_correct : validProofB_incorrect,
                 isCorrect ? validProofC_correct : validProofC_incorrect,
                 pubSignals
             ) {
+                ghostChallengeResponded[puzzleId][challengeId] = true;
+                
                 if (isCorrect) {
                     ghostPuzzleSolved[puzzleId] = true;
                     uint256 distributed = puzzle.bounty + challenge.stake;
@@ -230,27 +236,6 @@ contract GuessGameHandler is Test {
             }
         } catch {
             // Ignore
-        }
-    }
-    
-    // Helper to sum all contract funds
-    function sumTotalContractFunds() public view returns (uint256 total) {
-        uint256 puzzleCount = game.puzzleCount();
-        for (uint256 i = 1; i <= puzzleCount; i++) {
-            if (ghostPuzzleExists[i] && !ghostPuzzleSolved[i]) {
-                IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
-                total += puzzle.bounty + puzzle.creatorReward;
-            }
-        }
-
-        uint256 challengeCount = game.challengeCount();
-
-        for (uint256 i = 1; i <= challengeCount; i++) {
-            IGuessGame.Challenge memory challenge = game.getChallenge(i);
-
-            if (!challenge.responded) {
-                total += challenge.stake;
-            }
         }
     }
 }
