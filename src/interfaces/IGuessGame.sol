@@ -11,6 +11,7 @@ interface IGuessGame {
         uint256 stakeRequired;
         uint256 challengeCount;
         uint256 pendingChallenges;
+        uint256 lastChallengeTimestamp;
     }
 
     struct Challenge {
@@ -41,6 +42,7 @@ interface IGuessGame {
     error InvalidVerifierAddress();
     error NothingToClaim();
     error HasPendingChallenges();
+    error CancelTooSoon();
     error TransferFailed();
 
     // Functions
@@ -79,8 +81,11 @@ interface IGuessGame {
      * @notice Cancel a puzzle and get bounty back
      * @param puzzleId The puzzle to cancel
      * @dev Only callable by creator when there are no pending challenges
+     *      and CANCEL_TIMEOUT has passed since the last challenge was submitted
      */
     function cancelPuzzle(uint256 puzzleId) external;
+
+    function CANCEL_TIMEOUT() external view returns (uint256);
 
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
     function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory);

@@ -45,6 +45,7 @@ contract GuessGameTest is Test {
         assertEq(puzzle.cancelled, false);
         assertEq(puzzle.challengeCount, 0);
         assertEq(puzzle.pendingChallenges, 0);
+        assertEq(puzzle.lastChallengeTimestamp, 0);
 
         vm.stopPrank();
     }
@@ -82,6 +83,7 @@ contract GuessGameTest is Test {
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
         assertEq(puzzle.challengeCount, 1);
         assertEq(puzzle.pendingChallenges, 1);
+        assertEq(puzzle.lastChallengeTimestamp, block.timestamp);
 
         vm.stopPrank();
     }
@@ -194,5 +196,60 @@ contract GuessGameTest is Test {
         vm.prank(guesser);
         vm.expectRevert(IGuessGame.OnlyPuzzleCreator.selector);
         game.cancelPuzzle(puzzleId);
+    }
+
+    function test_CancelPuzzle_NoChallenges_ImmediateCancel() public {
+        // Create puzzle with no challenges - should be able to cancel immediately
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        uint256 creatorBalanceBefore = creator.balance;
+
+        // Can cancel immediately when no challenges have been submitted
+        vm.prank(creator);
+        game.cancelPuzzle(puzzleId);
+
+        assertEq(creator.balance, creatorBalanceBefore + 0.1 ether);
+    }
+
+    function test_CancelPuzzle_CancelTooSoon() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        // Submit a guess (creates lastChallengeTimestamp)
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Warp time but not enough (less than CANCEL_TIMEOUT)
+        vm.warp(block.timestamp + 12 hours);
+
+        // Trying to cancel should fail - still has pending challenge
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.HasPendingChallenges.selector);
+        game.cancelPuzzle(puzzleId);
+    }
+
+    function test_CancelPuzzle_AfterTimeout() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        // Submit a guess
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Warp time past timeout but still have pending challenge - should fail
+        vm.warp(block.timestamp + 2 days);
+
+        // Still can't cancel because challenge is pending
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.HasPendingChallenges.selector);
+        game.cancelPuzzle(puzzleId);
+    }
+
+    function test_CancelTimeout_Constant() public view {
+        // Verify the timeout constant is 1 day
+        assertEq(game.CANCEL_TIMEOUT(), 1 days);
     }
 }

@@ -12,6 +12,7 @@ contract GuessGame is IGuessGame {
     mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
 
     uint256 constant MIN_BOUNTY = 0.001 ether;
+    uint256 public constant CANCEL_TIMEOUT = 1 days;
 
     constructor(address _verifier) {
         if (_verifier == address(0)) revert InvalidVerifierAddress();
@@ -33,7 +34,8 @@ contract GuessGame is IGuessGame {
             bounty: msg.value,
             stakeRequired: stakeRequired,
             challengeCount: 0,
-            pendingChallenges: 0
+            pendingChallenges: 0,
+            lastChallengeTimestamp: 0
         });
 
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
@@ -51,6 +53,7 @@ contract GuessGame is IGuessGame {
 
         challengeId = puzzle.challengeCount++;
         puzzle.pendingChallenges++;
+        puzzle.lastChallengeTimestamp = block.timestamp;
 
         puzzleChallenges[puzzleId][challengeId] = Challenge({
             guesser: msg.sender,
@@ -119,6 +122,10 @@ contract GuessGame is IGuessGame {
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (puzzle.cancelled) revert PuzzleCancelledError();
         if (puzzle.pendingChallenges > 0) revert HasPendingChallenges();
+        // Can only cancel if no challenges yet, or timeout has passed since last challenge
+        if (puzzle.lastChallengeTimestamp != 0 && block.timestamp < puzzle.lastChallengeTimestamp + CANCEL_TIMEOUT) {
+            revert CancelTooSoon();
+        }
 
         puzzle.cancelled = true;
 

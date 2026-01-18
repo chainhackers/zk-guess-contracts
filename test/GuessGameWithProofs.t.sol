@@ -368,9 +368,17 @@ contract GuessGameWithProofsTest is Test {
             validPubSignals_incorrect
         );
 
+        // Can't cancel yet - timeout hasn't passed
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.CancelTooSoon.selector);
+        game.cancelPuzzle(puzzleId);
+
+        // Warp time past the timeout
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
+
         uint256 creatorBalanceBefore = creator.balance;
 
-        // Now can cancel
+        // Now can cancel after timeout
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 

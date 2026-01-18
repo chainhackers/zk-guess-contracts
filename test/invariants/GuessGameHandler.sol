@@ -186,8 +186,14 @@ contract GuessGameHandler is Test {
         }
     }
 
-    function cancelPuzzle(uint256 puzzleId, uint256 creatorSeed) public useActor(creators, creatorSeed) {
+    function cancelPuzzle(uint256 puzzleId, uint256 creatorSeed, uint256 timeWarp) public useActor(creators, creatorSeed) {
         if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId] || ghostPuzzleCancelled[puzzleId]) return;
+
+        // Optionally warp time to allow cancellation after timeout
+        uint256 warpAmount = bound(timeWarp, 0, 2 days);
+        if (warpAmount > 0) {
+            vm.warp(block.timestamp + warpAmount);
+        }
 
         try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
             if (puzzle.creator != creators[creatorSeed % creators.length]) return;
@@ -199,7 +205,7 @@ contract GuessGameHandler is Test {
                 ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId];
                 ghostPuzzleBounty[puzzleId] = 0;
             } catch {
-                // Ignore reverts
+                // Ignore reverts (including CancelTooSoon)
             }
         } catch {
             // Ignore
