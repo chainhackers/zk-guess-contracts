@@ -4,21 +4,21 @@ pragma solidity ^0.8.30;
 interface IGuessGame {
     struct Puzzle {
         address creator;
+        bool solved;
+        bool cancelled;
         bytes32 commitment;
         uint256 bounty;
         uint256 stakeRequired;
-        uint8 bountyGrowthPercent;
-        uint256 totalStaked;
-        uint256 creatorReward;
-        bool solved;
+        uint256 challengeCount;
+        uint256 pendingChallenges;
     }
 
     struct Challenge {
         address guesser;
+        bool responded;
         uint256 guess;
         uint256 stake;
         uint256 timestamp;
-        bool responded;
     }
 
     // Events
@@ -26,43 +26,48 @@ interface IGuessGame {
     event ChallengeCreated(uint256 indexed challengeId, uint256 indexed puzzleId, address guesser, uint256 guess);
     event ChallengeResponded(uint256 indexed challengeId, bool correct);
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
+    event PuzzleCancelled(uint256 indexed puzzleId);
 
     // Errors
     error InsufficientBounty();
     error InsufficientStake();
     error PuzzleAlreadySolved();
+    error PuzzleCancelledError();
     error ChallengeAlreadyResponded();
     error OnlyPuzzleCreator();
-    error CannotGuessOwnPuzzle();
     error InvalidProof();
     error ChallengeNotFound();
     error PuzzleNotFound();
-    error InvalidGrowthPercent();
     error InvalidVerifierAddress();
     error NothingToClaim();
-    error TransferToWinnerFailed();
-    error TransferToCreatorFailed();
-    error TransferToClaimerFailed();
+    error HasPendingChallenges();
+    error TransferFailed();
 
     // Functions
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint8 bountyGrowthPercent)
-        external
-        payable
-        returns (uint256 puzzleId);
+    function createPuzzle(
+        bytes32 commitment,
+        uint256 stakeRequired
+    ) external payable returns (uint256 puzzleId);
 
-    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId);
+    function submitGuess(
+        uint256 puzzleId,
+        uint256 guess
+    ) external payable returns (uint256 challengeId);
 
     /**
      * @notice Respond to a challenge with a ZK proof
+     * @param puzzleId The puzzle the challenge belongs to
      * @param challengeId The challenge to respond to
      * @param _pA, _pB, _pC The proof components
      * @param _pubSignals Public signals: [commitment, isCorrect]
      *                    where isCorrect = 1 if guess matches secret, 0 otherwise
      * @dev The creator proves they know the secret (never revealed) and whether the guess is correct
-     *      If correct: puzzle is solved, guesser wins bounty + stakes
-     *      If incorrect: guesser loses stake, which is added to bounty
+     *      Guesser always gets their stake back
+     *      If correct: puzzle is solved, guesser also wins bounty
+     *      If incorrect: guesser just gets stake back
      */
     function respondToChallenge(
+        uint256 puzzleId,
         uint256 challengeId,
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
@@ -70,8 +75,14 @@ interface IGuessGame {
         uint256[2] calldata _pubSignals
     ) external;
 
+    /**
+     * @notice Cancel a puzzle and get bounty back
+     * @param puzzleId The puzzle to cancel
+     * @dev Only callable by creator when there are no pending challenges
+     */
+    function cancelPuzzle(uint256 puzzleId) external;
+
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
-    function getChallenge(uint256 challengeId) external view returns (Challenge memory);
+    function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory);
     function puzzleCount() external view returns (uint256);
-    function challengeCount() external view returns (uint256);
 }

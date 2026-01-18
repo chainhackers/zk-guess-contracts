@@ -7,11 +7,9 @@ import "./interfaces/IGuessGame.sol";
 contract GuessGame is IGuessGame {
     IGroth16Verifier public immutable verifier;
     uint256 public puzzleCount;
-    uint256 public challengeCount;
 
     mapping(uint256 => Puzzle) public puzzles;
-    mapping(uint256 => Challenge) public challenges;
-    mapping(uint256 => uint256) public challengeToPuzzle;
+    mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
 
     uint256 constant MIN_BOUNTY = 0.001 ether;
 
@@ -20,62 +18,68 @@ contract GuessGame is IGuessGame {
         verifier = IGroth16Verifier(_verifier);
     }
 
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint8 bountyGrowthPercent)
-        external
-        payable
-        returns (uint256 puzzleId)
-    {
+    function createPuzzle(
+        bytes32 commitment,
+        uint256 stakeRequired
+    ) external payable returns (uint256 puzzleId) {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
-        if (bountyGrowthPercent > 100) revert InvalidGrowthPercent();
 
         puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
             creator: msg.sender,
+            solved: false,
+            cancelled: false,
             commitment: commitment,
             bounty: msg.value,
             stakeRequired: stakeRequired,
-            bountyGrowthPercent: bountyGrowthPercent,
-            totalStaked: 0,
-            creatorReward: 0,
-            solved: false
+            challengeCount: 0,
+            pendingChallenges: 0
         });
 
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
     }
 
-    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId) {
+    function submitGuess(
+        uint256 puzzleId,
+        uint256 guess
+    ) external payable returns (uint256 challengeId) {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
-        if (msg.sender == puzzle.creator) revert CannotGuessOwnPuzzle();
+        if (puzzle.cancelled) revert PuzzleCancelledError();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
 
-        challengeId = challengeCount++;
-        challenges[challengeId] = Challenge({
-            guesser: msg.sender, guess: guess, stake: msg.value, timestamp: block.timestamp, responded: false
-        });
-        challengeToPuzzle[challengeId] = puzzleId;
+        challengeId = puzzle.challengeCount++;
+        puzzle.pendingChallenges++;
 
-        puzzle.totalStaked += msg.value;
+        puzzleChallenges[puzzleId][challengeId] = Challenge({
+            guesser: msg.sender,
+            responded: false,
+            guess: guess,
+            stake: msg.value,
+            timestamp: block.timestamp
+        });
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
     }
 
     function respondToChallenge(
+        uint256 puzzleId,
         uint256 challengeId,
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
         uint256[2] calldata _pubSignals
     ) external {
-        Challenge storage challenge = challenges[challengeId];
-        if (challenge.guesser == address(0)) revert ChallengeNotFound();
-        if (challenge.responded) revert ChallengeAlreadyResponded();
-
-        uint256 puzzleId = challengeToPuzzle[challengeId];
         Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
+        if (puzzle.cancelled) revert PuzzleCancelledError();
+
+        Challenge storage challenge = puzzleChallenges[puzzleId][challengeId];
+        if (challenge.guesser == address(0)) revert ChallengeNotFound();
+        if (challenge.responded) revert ChallengeAlreadyResponded();
 
         // Verify the proof using external verifier
         if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
@@ -88,43 +92,48 @@ contract GuessGame is IGuessGame {
         if (commitment != puzzle.commitment) revert InvalidProof();
 
         challenge.responded = true;
+        puzzle.pendingChallenges--;
+
         emit ChallengeResponded(challengeId, isCorrect);
 
         if (isCorrect) {
             puzzle.solved = true;
 
-            uint256 totalPrize = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
+            // Winner gets bounty + their stake back
+            uint256 totalPrize = puzzle.bounty + challenge.stake;
             emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
 
             (bool success,) = challenge.guesser.call{value: totalPrize}("");
-            if (!success) revert TransferToWinnerFailed();
+            if (!success) revert TransferFailed();
         } else {
-            uint256 stakeGrowth = (challenge.stake * puzzle.bountyGrowthPercent) / 100;
-            puzzle.bounty += stakeGrowth;
-            puzzle.creatorReward += (challenge.stake - stakeGrowth);
+            // Wrong guess: guesser gets stake back
+            (bool success,) = challenge.guesser.call{value: challenge.stake}("");
+            if (!success) revert TransferFailed();
         }
+    }
+
+    function cancelPuzzle(uint256 puzzleId) external {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
+        if (puzzle.solved) revert PuzzleAlreadySolved();
+        if (puzzle.cancelled) revert PuzzleCancelledError();
+        if (puzzle.pendingChallenges > 0) revert HasPendingChallenges();
+
+        puzzle.cancelled = true;
+
+        emit PuzzleCancelled(puzzleId);
+
+        // Return bounty to creator
+        (bool success,) = puzzle.creator.call{value: puzzle.bounty}("");
+        if (!success) revert TransferFailed();
     }
 
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory) {
         return puzzles[puzzleId];
     }
 
-    function getChallenge(uint256 challengeId) external view returns (Challenge memory) {
-        return challenges[challengeId];
-    }
-
-    function closePuzzle(uint256 puzzleId) external {
-        Puzzle storage puzzle = puzzles[puzzleId];
-        if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
-        if (puzzle.solved) revert PuzzleAlreadySolved();
-
-        uint256 totalAmount = puzzle.bounty + puzzle.totalStaked;
-        if (totalAmount == 0) revert NothingToClaim();
-
-        // Delete puzzle to get gas refund
-        delete puzzles[puzzleId];
-
-        (bool success,) = msg.sender.call{value: totalAmount}("");
-        if (!success) revert TransferToClaimerFailed();
+    function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory) {
+        return puzzleChallenges[puzzleId][challengeId];
     }
 }

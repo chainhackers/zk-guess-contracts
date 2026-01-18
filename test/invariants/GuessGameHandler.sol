@@ -15,10 +15,11 @@ contract GuessGameHandler is Test {
     Groth16Verifier public immutable verifier;
 
     // Ghost variables for tracking state
-    mapping(uint256 => uint256) public ghostTotalStakes; // Track total stakes per puzzle
     mapping(uint256 => bool) public ghostPuzzleExists;
     mapping(uint256 => bool) public ghostPuzzleSolved;
-    mapping(uint256 => uint256) public ghostPuzzleFunds; // bounty + totalStaked per puzzle
+    mapping(uint256 => bool) public ghostPuzzleCancelled;
+    mapping(uint256 => uint256) public ghostPuzzleBounty; // bounty per puzzle
+    mapping(uint256 => uint256) public ghostPuzzlePendingStakes; // sum of pending stakes per puzzle
     uint256 public ghostTotalContractFunds;
 
     // Actors
@@ -30,7 +31,6 @@ contract GuessGameHandler is Test {
     uint256 constant MAX_STAKE = 1 ether;
     uint256 constant MIN_BOUNTY = 0.001 ether;
     uint256 constant MAX_BOUNTY = 10 ether;
-    uint8 constant MAX_GROWTH_PERCENT = 100;
 
     // Valid proofs for testing (from actual circuit)
     uint256[2] validProofA_correct = [
@@ -95,11 +95,6 @@ contract GuessGameHandler is Test {
         _;
     }
 
-    modifier boundGrowthPercent(uint8 percent) {
-        percent = uint8(bound(uint256(percent), 0, MAX_GROWTH_PERCENT));
-        _;
-    }
-
     modifier useActor(address[] memory actors, uint256 actorSeed) {
         address actor = actors[actorSeed % actors.length];
         vm.startPrank(actor);
@@ -115,22 +110,19 @@ contract GuessGameHandler is Test {
     }
 
     // Handler functions
-    function createPuzzle(uint256 bountyAmount, uint256 stakeRequired, uint8 growthPercent, uint256 creatorSeed)
+    function createPuzzle(uint256 bountyAmount, uint256 stakeRequired, uint256 creatorSeed)
         public
         boundBounty(bountyAmount)
         boundStake(stakeRequired)
-        boundGrowthPercent(growthPercent)
         useActor(creators, creatorSeed)
     {
         // Fund the creator
         vm.deal(creators[creatorSeed % creators.length], bountyAmount);
 
-        try game.createPuzzle{value: bountyAmount}(COMMITMENT_42_123, stakeRequired, growthPercent) returns (
-            uint256 puzzleId
-        ) {
+        try game.createPuzzle{value: bountyAmount}(COMMITMENT_42_123, stakeRequired) returns (uint256 puzzleId) {
             // Update ghost variables
             ghostPuzzleExists[puzzleId] = true;
-            ghostPuzzleFunds[puzzleId] = bountyAmount;
+            ghostPuzzleBounty[puzzleId] = bountyAmount;
             ghostTotalContractFunds += bountyAmount;
         } catch {
             // Ignore reverts
@@ -142,56 +134,50 @@ contract GuessGameHandler is Test {
         boundStake(stakeAmount)
         useActor(guessers, guesserSeed)
     {
-        if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId]) return;
+        if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId] || ghostPuzzleCancelled[puzzleId]) return;
 
         // Fund the guesser
         vm.deal(guessers[guesserSeed % guessers.length], stakeAmount);
 
         try game.submitGuess{value: stakeAmount}(puzzleId, guess) returns (uint256) {
             // Update ghost variables
-            ghostTotalStakes[puzzleId] += stakeAmount;
-            ghostPuzzleFunds[puzzleId] += stakeAmount;
+            ghostPuzzlePendingStakes[puzzleId] += stakeAmount;
             ghostTotalContractFunds += stakeAmount;
         } catch {
             // Ignore reverts
         }
     }
 
-    function respondToChallenge(uint256 challengeId, bool isCorrect, uint256 creatorSeed)
+    function respondToChallenge(uint256 puzzleId, uint256 challengeId, bool isCorrect, uint256 creatorSeed)
         public
         useActor(creators, creatorSeed)
     {
-        // Get puzzle info
-        try game.getChallenge(challengeId) returns (IGuessGame.Challenge memory challenge) {
-            if (challenge.responded) return;
+        if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId] || ghostPuzzleCancelled[puzzleId]) return;
 
-            uint256 puzzleId = game.challengeToPuzzle(challengeId);
-            IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-
-            if (puzzle.solved) return;
+        // Get challenge info
+        try game.getChallenge(puzzleId, challengeId) returns (IGuessGame.Challenge memory challenge) {
+            if (challenge.guesser == address(0) || challenge.responded) return;
 
             uint256[2] memory pubSignals = [uint256(COMMITMENT_42_123), isCorrect ? 1 : 0];
 
-            uint256 balanceBefore = address(game).balance;
-
             try game.respondToChallenge(
+                puzzleId,
                 challengeId,
                 isCorrect ? validProofA_correct : validProofA_incorrect,
                 isCorrect ? validProofB_correct : validProofB_incorrect,
                 isCorrect ? validProofC_correct : validProofC_incorrect,
                 pubSignals
             ) {
-                if (isCorrect) {
-                    // Puzzle solved - funds distributed
-                    ghostPuzzleSolved[puzzleId] = true;
-                    uint256 distributed = puzzle.bounty + puzzle.totalStaked - puzzle.creatorReward;
-                    ghostTotalContractFunds -= distributed;
-                    ghostPuzzleFunds[puzzleId] = 0;
-                }
+                // Stake is always returned to guesser
+                ghostPuzzlePendingStakes[puzzleId] -= challenge.stake;
+                ghostTotalContractFunds -= challenge.stake;
 
-                // Verify no ETH was created or destroyed
-                uint256 balanceAfter = address(game).balance;
-                assert(balanceBefore >= balanceAfter);
+                if (isCorrect) {
+                    // Puzzle solved - bounty also distributed
+                    ghostPuzzleSolved[puzzleId] = true;
+                    ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId];
+                    ghostPuzzleBounty[puzzleId] = 0;
+                }
             } catch {
                 // Ignore reverts
             }
@@ -200,19 +186,18 @@ contract GuessGameHandler is Test {
         }
     }
 
-    function closePuzzle(uint256 puzzleId, uint256 creatorSeed) public useActor(creators, creatorSeed) {
-        if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId]) return;
+    function cancelPuzzle(uint256 puzzleId, uint256 creatorSeed) public useActor(creators, creatorSeed) {
+        if (!ghostPuzzleExists[puzzleId] || ghostPuzzleSolved[puzzleId] || ghostPuzzleCancelled[puzzleId]) return;
 
         try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
             if (puzzle.creator != creators[creatorSeed % creators.length]) return;
+            if (puzzle.pendingChallenges > 0) return;
 
-            uint256 expectedPayout = puzzle.bounty + puzzle.totalStaked;
-
-            try game.closePuzzle(puzzleId) {
+            try game.cancelPuzzle(puzzleId) {
                 // Update ghost variables
-                ghostPuzzleFunds[puzzleId] = 0;
-                ghostTotalContractFunds -= expectedPayout;
-                ghostPuzzleExists[puzzleId] = false;
+                ghostPuzzleCancelled[puzzleId] = true;
+                ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId];
+                ghostPuzzleBounty[puzzleId] = 0;
             } catch {
                 // Ignore reverts
             }
@@ -225,9 +210,8 @@ contract GuessGameHandler is Test {
     function sumActivePuzzleFunds() public view returns (uint256 total) {
         uint256 puzzleCount = game.puzzleCount();
         for (uint256 i = 0; i < puzzleCount; i++) {
-            if (ghostPuzzleExists[i] && !ghostPuzzleSolved[i]) {
-                IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
-                total += puzzle.bounty + puzzle.totalStaked;
+            if (ghostPuzzleExists[i] && !ghostPuzzleSolved[i] && !ghostPuzzleCancelled[i]) {
+                total += ghostPuzzleBounty[i] + ghostPuzzlePendingStakes[i];
             }
         }
     }
