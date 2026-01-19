@@ -19,50 +19,76 @@ contract GuessGameWithProofsTest is Test {
 
     // Valid proof for correct guess (42)
     uint256[2] validProofA_correct = [
-        5157887698177337623115911855277593515678867316837177621945040770006555507013,
-        2906418579536343400716582440049667062559269406745718123049284811979351078961
+        20733104445222474913460899055922638733390515415268774731643134142498872084191,
+        14000468808382636465462761302394038173719213862863751644422554851223456811411
     ];
     uint256[2][2] validProofB_correct = [
         [
-            14332055634374331006889483633092758827337849388827220354213364180982843452222,
-            19810903419040124121233668365857833379920314502394091870176177029284861054627
+            14529324359401080920218683234881556919213052277135946418796017114639319774385,
+            12129083737057255635218975576710777788141717515839459178762095078342656790038
         ],
         [
-            14914521979328201877060585819741683859740663954794671014405495630456970523413,
-            5932921202897788419271490057837377976593298755559539853566958258387675310919
+            4006130398494418696741732007622629431845312574338850368957129174821663088541,
+            5320382245369139568202711526684359871618209808068963385672210545364024687600
         ]
     ];
     uint256[2] validProofC_correct = [
-        19225161834181317330543503779290557071354809366572782951390269839775729508986,
-        2612633047517129916523257452953334712431527691991012490800657229613067565909
+        11555678601106434654959630063997038302724273931564919993607610338934924583422,
+        12395595758571672800576038452878068084738676055843400774526791354550122500902
     ];
-    uint256[2] validPubSignals_correct = [
+    uint256[3] validPubSignals_correct = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
-        1 // isCorrect = true
+        1, // isCorrect = true
+        42 //guess
     ];
 
     // Valid proof for incorrect guess (50)
     uint256[2] validProofA_incorrect = [
-        9758308845527562880152000047576342898199622908603024910972559233417444022851,
-        13422093807828339412230457774329866784975316828562739791130382143618778496264
+        260224852269514550962255596791713148069192103530930225168509498623216740997,
+        3464936673232863366747749560095954607406672448198506930195439109614243395305
     ];
     uint256[2][2] validProofB_incorrect = [
         [
-            9091300984639239739423744708847319435452500770118051644787336315262064631896,
-            2270884553819703540920998596410221495666419821064349332236675366442618568527
+            18076787037990225159899307248733301104058781270403724423075272532649526747523,
+            21163582130445499238873337568384386692136208661991064222861763232945956209076
         ],
         [
-            14277132759968817182426864918099654463588513402666202713843117479877941998171,
-            2239514721205042574478060827327107365740006011919760432858530138062064747403
+            14700551543044113104786011479044690264965500866720142037325671448170897252180,
+            248536395010580566114959855988956594661021088223112251086687402479116093507
         ]
     ];
     uint256[2] validProofC_incorrect = [
-        4604401960742347972625156994490312017011144396786495069487929528815195101025,
-        10202941257821071730828470950370450429224326502691136785274183779399028461980
+        3718774677296111965628987936986701738438916711731522663485615268638604855259,
+        15664470303899517099778638779831003600948012776255763324223926677414563225933
     ];
-    uint256[2] validPubSignals_incorrect = [
+    uint256[3] validPubSignals_incorrect = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
-        0 // isCorrect = false
+        0, // isCorrect = false
+        50 //guess
+    ];
+
+    uint256[2] validProofA_incorrect_99 = [
+        1522250115459347886732366836753121648149166765464232477792700654355908098958,
+        12230247335391372868598697888961446586952358073485687489866514136177234102516
+    ];
+    uint256[2][2] validProofB_incorrect_99 = [
+        [
+            829808490343623106010157378861222277376158829827485398099043639305686191932,
+            17794992986969421673750416099231395431613517939633365877256108996901124885408
+        ],
+        [
+            13764104074731906666379119009729886488089352881221577140560629738823728313757,
+            8228639052365462362835629439297935566254125449786065112616179334330818224187
+        ]
+    ];
+    uint256[2] validProofC_incorrect_99 = [
+        1477156412658329873137803094926985163386885774473985262711014984933715457935,
+        13394207920715449173518714206562449218544155651180071706369101076169486617299
+    ];
+    uint256[3] validPubSignals_incorrect_99 = [
+        uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
+        0, // isCorrect = false
+        99 //guess
     ];
 
     function setUp() public {
@@ -179,15 +205,15 @@ contract GuessGameWithProofsTest is Test {
 
         uint256 guesser2BalanceBefore = guesser2.balance;
 
-        // For simplicity, reuse the same incorrect proof (in reality would be different)
+        // Respond with proof for guess 99
         vm.prank(creator);
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
         );
 
         // Guesser2 should have stake back
@@ -230,17 +256,18 @@ contract GuessGameWithProofsTest is Test {
         uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
 
         // Respond out of order - challenge 2 first (should work with no queue enforcement)
+        // Must use correct proof for guess 99
         vm.prank(creator);
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
         );
 
-        // Then respond to challenge 1
+        // Then respond to challenge 1 with proof for guess 50
         vm.prank(creator);
         game.respondToChallenge(
             puzzleId,
@@ -267,15 +294,48 @@ contract GuessGameWithProofsTest is Test {
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Create proof with wrong commitment
-        uint256[2] memory wrongPubSignals = [
+        uint256[3] memory wrongPubSignals = [
             uint256(0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef), // wrong commitment
-            1
+            1,
+            42
         ];
 
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProof.selector);
         game.respondToChallenge(
             puzzleId, challengeId, validProofA_correct, validProofB_correct, validProofC_correct, wrongPubSignals
+        );
+    }
+
+    function test_RespondToChallenge_InvalidProofForChallengeGuess() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Guesser submits guess 11
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 11);
+
+        // Guesser submits guess 42
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Try to respond to challenge for guess 11 with proof for guess 42 - should fail
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            puzzleId, challengeId, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+        );
+
+        // Try to respond to challenge for guess 42 with proof for guess 99 - should fail
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1,
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
         );
     }
 
@@ -511,5 +571,175 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser);
         vm.expectRevert(IGuessGame.ChallengeAlreadyResponded.selector);
         game.claimFromForfeited(puzzleId, challengeId1);
+    }
+
+    // ============ Multi-Operation Scenario Test ============
+
+    /**
+     * @notice Complete game flow test:
+     * 1. Creator creates a puzzle
+     * 2. 2 guessers submit wrong guesses
+     * 3. Creator tries to submit proofs for wrong guess numbers and fails
+     * 4. Creator submits proper proofs (guessers get stakes back)
+     * 5. 3rd guesser submits the right answer
+     * 6. Creator responds and guesser wins bounty + stake
+     */
+    function test_CompleteGameFlow_WrongProofsThenCorrectWin() public {
+        // Track balances
+        uint256 creatorStartBalance = creator.balance;
+        uint256 guesser1StartBalance = guesser.balance;
+        uint256 guesser2StartBalance = guesser2.balance;
+
+        // ========== Step 1: Creator creates puzzle ==========
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        assertEq(creator.balance, creatorStartBalance - 0.1 ether);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.creator, creator);
+        assertEq(puzzle.bounty, 0.1 ether);
+        assertEq(puzzle.solved, false);
+
+        // ========== Step 2: 2 guessers submit wrong guesses ==========
+        // Guesser 1 guesses 50 (wrong)
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+        assertEq(guesser.balance, guesser1StartBalance - 0.01 ether);
+
+        // Guesser 2 guesses 99 (wrong)
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+        assertEq(guesser2.balance, guesser2StartBalance - 0.01 ether);
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 2);
+        assertEq(puzzle.challengeCount, 2);
+
+        // ========== Step 3: Creator tries wrong proofs and fails ==========
+        // Try to respond to challenge for guess 50 with proof for guess 99
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1, // challenge for guess 50
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99 // proof for guess 99
+        );
+
+        // Try to respond to challenge for guess 99 with proof for guess 50
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId2, // challenge for guess 99
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect // proof for guess 50
+        );
+
+        // Try to respond to wrong guess with correct proof (proof says correct but guess wasn't 42)
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1, // challenge for guess 50
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct // proof for guess 42 (correct answer)
+        );
+
+        // Challenges should still be pending
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 2);
+
+        // ========== Step 4: Creator submits proper proofs ==========
+        // Respond to guess 50 with proof for guess 50
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+
+        // Guesser 1 should have stake back
+        assertEq(guesser.balance, guesser1StartBalance);
+
+        // Respond to guess 99 with proof for guess 99
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId2,
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
+        );
+
+        // Guesser 2 should have stake back
+        assertEq(guesser2.balance, guesser2StartBalance);
+
+        // Puzzle should still be unsolved with no pending challenges
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.solved, false);
+        assertEq(puzzle.pendingChallenges, 0);
+        assertEq(puzzle.bounty, 0.1 ether); // Bounty intact
+
+        // ========== Step 5: 3rd guesser submits the right answer ==========
+        address guesser3 = makeAddr("guesser3");
+        vm.deal(guesser3, 10 ether);
+        uint256 guesser3StartBalance = guesser3.balance;
+
+        vm.prank(guesser3);
+        uint256 challengeId3 = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        assertEq(guesser3.balance, guesser3StartBalance - 0.01 ether);
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 1);
+        assertEq(puzzle.challengeCount, 3);
+
+        // ========== Step 6: Creator responds, guesser wins bounty + stake ==========
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId3,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
+        );
+
+        // Verify final state
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.solved, true);
+        assertEq(puzzle.pendingChallenges, 0);
+
+        // Winner (guesser3) gets bounty + stake
+        uint256 expectedWinnerPrize = 0.1 ether + 0.01 ether;
+        assertEq(guesser3.balance, guesser3StartBalance - 0.01 ether + expectedWinnerPrize);
+        assertEq(guesser3.balance, guesser3StartBalance + 0.1 ether); // Net gain = bounty
+
+        // Creator lost the bounty (paid out to winner)
+        assertEq(creator.balance, creatorStartBalance - 0.1 ether);
+
+        // Guesser 1 and 2 are back to original balances (stakes returned)
+        assertEq(guesser.balance, guesser1StartBalance);
+        assertEq(guesser2.balance, guesser2StartBalance);
+
+        // Verify challenges are marked as responded
+        IGuessGame.Challenge memory c1 = game.getChallenge(puzzleId, challengeId1);
+        IGuessGame.Challenge memory c2 = game.getChallenge(puzzleId, challengeId2);
+        IGuessGame.Challenge memory c3 = game.getChallenge(puzzleId, challengeId3);
+        assertEq(c1.responded, true);
+        assertEq(c2.responded, true);
+        assertEq(c3.responded, true);
     }
 }

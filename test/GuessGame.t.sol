@@ -152,7 +152,7 @@ contract GuessGameTest is Test {
         uint256[2] memory pA = [uint256(0), uint256(0)];
         uint256[2][2] memory pB = [[uint256(0), uint256(0)], [uint256(0), uint256(0)]];
         uint256[2] memory pC = [uint256(0), uint256(0)];
-        uint256[2] memory pubSignals = [uint256(0), uint256(0)];
+        uint256[3] memory pubSignals = [uint256(0), uint256(0), uint256(0)];
 
         vm.expectRevert(IGuessGame.OnlyPuzzleCreator.selector);
         game.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);
