@@ -742,4 +742,169 @@ contract GuessGameWithProofsTest is Test {
         assertEq(c2.responded, true);
         assertEq(c3.responded, true);
     }
+
+    /**
+     * @notice Test that creator can respond to challenges in any order
+     * Challenges submitted: 1, 2, 3
+     * Responses given: 3, 1, 2 (reverse/mixed order)
+     */
+    function test_ResponsesInAnyOrder() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Submit 3 guesses in order
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        address guesser3 = makeAddr("guesser3");
+        vm.deal(guesser3, 10 ether);
+        vm.prank(guesser3);
+        uint256 challengeId3 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 3);
+
+        // Respond in order: 3, 1, 2 (not submission order)
+
+        // First respond to challenge 3
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId3,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 2);
+        assertEq(game.getChallenge(puzzleId, challengeId3).responded, true);
+        assertEq(game.getChallenge(puzzleId, challengeId1).responded, false);
+        assertEq(game.getChallenge(puzzleId, challengeId2).responded, false);
+
+        // Then respond to challenge 1
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 1);
+        assertEq(game.getChallenge(puzzleId, challengeId1).responded, true);
+        assertEq(game.getChallenge(puzzleId, challengeId2).responded, false);
+
+        // Finally respond to challenge 2
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId2,
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
+        );
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 0);
+        assertEq(game.getChallenge(puzzleId, challengeId2).responded, true);
+
+        // All responded, puzzle still unsolved
+        assertEq(puzzle.solved, false);
+    }
+
+    /**
+     * @notice Test that after forfeit, guessers can claim in any order
+     * Guessers: 1, 2, 3, 4
+     * Claims made: 4, 2, 1, 3 (random order)
+     */
+    function test_ForfeitClaimsInAnyOrder() public {
+        // Create puzzle with bounty divisible by 4
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Create 4 guessers and submit guesses
+        address guesser3 = makeAddr("guesser3");
+        address guesser4 = makeAddr("guesser4");
+        vm.deal(guesser3, 10 ether);
+        vm.deal(guesser4, 10 ether);
+
+        uint256 guesser1Start = guesser.balance;
+        uint256 guesser2Start = guesser2.balance;
+        uint256 guesser3Start = guesser3.balance;
+        uint256 guesser4Start = guesser4.balance;
+
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        vm.prank(guesser3);
+        uint256 challengeId3 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser4);
+        uint256 challengeId4 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 4);
+
+        // Warp time past timeout and forfeit
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, challengeId1);
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.forfeited, true);
+        assertEq(puzzle.pendingAtForfeit, 4);
+
+        // Each guesser should get: stake (0.01) + bounty share (0.2 / 4 = 0.05)
+        uint256 expectedPayout = 0.01 ether + 0.05 ether;
+
+        // Claim in order: 4, 2, 1, 3 (not submission order)
+
+        // Guesser 4 claims first
+        vm.prank(guesser4);
+        game.claimFromForfeited(puzzleId, challengeId4);
+        assertEq(guesser4.balance, guesser4Start - 0.01 ether + expectedPayout);
+
+        // Guesser 2 claims second
+        vm.prank(guesser2);
+        game.claimFromForfeited(puzzleId, challengeId2);
+        assertEq(guesser2.balance, guesser2Start - 0.01 ether + expectedPayout);
+
+        // Guesser 1 claims third
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId, challengeId1);
+        assertEq(guesser.balance, guesser1Start - 0.01 ether + expectedPayout);
+
+        // Guesser 3 claims last
+        vm.prank(guesser3);
+        game.claimFromForfeited(puzzleId, challengeId3);
+        assertEq(guesser3.balance, guesser3Start - 0.01 ether + expectedPayout);
+
+        // Verify all claims processed
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 0);
+
+        // Verify all challenges marked as responded (claimed)
+        assertEq(game.getChallenge(puzzleId, challengeId1).responded, true);
+        assertEq(game.getChallenge(puzzleId, challengeId2).responded, true);
+        assertEq(game.getChallenge(puzzleId, challengeId3).responded, true);
+        assertEq(game.getChallenge(puzzleId, challengeId4).responded, true);
+
+        // Verify net gains: each guesser gained 0.05 ether (their share of bounty)
+        assertEq(guesser.balance, guesser1Start + 0.05 ether);
+        assertEq(guesser2.balance, guesser2Start + 0.05 ether);
+        assertEq(guesser3.balance, guesser3Start + 0.05 ether);
+        assertEq(guesser4.balance, guesser4Start + 0.05 ether);
+    }
 }
