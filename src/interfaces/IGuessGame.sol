@@ -12,7 +12,7 @@ interface IGuessGame {
         uint256 creatorReward;
         bool solved;
     }
-    
+
     struct Challenge {
         address guesser;
         uint256 guess;
@@ -20,19 +20,20 @@ interface IGuessGame {
         uint256 timestamp;
         bool responded;
     }
-    
+
     // Events
     event PuzzleCreated(uint256 indexed puzzleId, address creator, bytes32 commitment, uint256 bounty);
     event ChallengeCreated(uint256 indexed challengeId, uint256 indexed puzzleId, address guesser, uint256 guess);
     event ChallengeResponded(uint256 indexed challengeId, bool correct);
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
-    
+
     // Errors
     error InsufficientBounty();
     error InsufficientStake();
     error PuzzleAlreadySolved();
     error ChallengeAlreadyResponded();
     error OnlyPuzzleCreator();
+    error CannotGuessOwnPuzzle();
     error InvalidProof();
     error InvalidProofForChallengeGuess();
     error ChallengeNotFound();
@@ -43,19 +44,15 @@ interface IGuessGame {
     error TransferToWinnerFailed();
     error TransferToCreatorFailed();
     error TransferToClaimerFailed();
-    
+
     // Functions
-    function createPuzzle(
-        bytes32 commitment,
-        uint256 stakeRequired,
-        uint8 bountyGrowthPercent
-    ) external payable returns (uint256 puzzleId);
-    
-    function submitGuess(
-        uint256 puzzleId,
-        uint256 guess
-    ) external payable returns (uint256 challengeId);
-    
+    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint8 bountyGrowthPercent)
+        external
+        payable
+        returns (uint256 puzzleId);
+
+    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId);
+
     /**
      * @notice Respond to a challenge with a ZK proof
      * @param challengeId The challenge to respond to
@@ -68,12 +65,12 @@ interface IGuessGame {
      */
     function respondToChallenge(
         uint256 challengeId,
-        uint[2] calldata _pA,
-        uint[2][2] calldata _pB,
-        uint[2] calldata _pC,
-        uint[3] calldata _pubSignals
+        uint256[2] calldata _pA,
+        uint256[2][2] calldata _pB,
+        uint256[2] calldata _pC,
+        uint256[3] calldata _pubSignals
     ) external;
-    
+
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
     function getChallenge(uint256 challengeId) external view returns (Challenge memory);
     function puzzleCount() external view returns (uint256);
