@@ -66,7 +66,7 @@ contract GuessGame is IGuessGame {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[2] calldata _pubSignals
+        uint256[3] calldata _pubSignals
     ) external {
         Challenge storage challenge = challenges[challengeId];
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
@@ -83,9 +83,11 @@ contract GuessGame is IGuessGame {
         // Extract public signals
         bytes32 commitment = bytes32(_pubSignals[0]);
         bool isCorrect = _pubSignals[1] == 1;
+        uint256 proofGuess = _pubSignals[2];
 
         // Verify commitment matches puzzle
         if (commitment != puzzle.commitment) revert InvalidProof();
+        if (proofGuess != challenge.guess) revert InvalidProofForChallengeGuess();
 
         challenge.responded = true;
         emit ChallengeResponded(challengeId, isCorrect);
