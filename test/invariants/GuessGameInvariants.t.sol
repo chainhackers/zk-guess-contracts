@@ -22,11 +22,13 @@ contract GuessGameInvariants is Test {
         targetContract(address(handler));
 
         // Only call handler functions
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = GuessGameHandler.createPuzzle.selector;
         selectors[1] = GuessGameHandler.submitGuess.selector;
         selectors[2] = GuessGameHandler.respondToChallenge.selector;
         selectors[3] = GuessGameHandler.cancelPuzzle.selector;
+        selectors[4] = GuessGameHandler.forfeitPuzzle.selector;
+        selectors[5] = GuessGameHandler.claimFromForfeited.selector;
 
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
@@ -58,8 +60,8 @@ contract GuessGameInvariants is Test {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             // All created puzzles should have a creator
             if (puzzle.creator != address(0)) {
-                // If not cancelled, bounty should be at least MIN_BOUNTY
-                if (!puzzle.cancelled && !puzzle.solved) {
+                // If not cancelled/solved/forfeited, bounty should be at least MIN_BOUNTY
+                if (!puzzle.cancelled && !puzzle.solved && !puzzle.forfeited) {
                     assert(puzzle.bounty >= 0.001 ether);
                 }
             }
@@ -95,6 +97,20 @@ contract GuessGameInvariants is Test {
     }
 
     /**
+     * @notice Forfeited puzzles should remain forfeited forever
+     */
+    function invariant_forfeitedPuzzlesImmutable() public view {
+        uint256 puzzleCount = game.puzzleCount();
+
+        for (uint256 i = 0; i < puzzleCount; i++) {
+            if (handler.ghostPuzzleForfeited(i)) {
+                IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
+                assert(puzzle.forfeited == true);
+            }
+        }
+    }
+
+    /**
      * @notice Challenge responses should be immutable
      */
     function invariant_challengeResponsesImmutable() public view {
@@ -120,7 +136,7 @@ contract GuessGameInvariants is Test {
 
         for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
-            if (puzzle.creator != address(0) && !puzzle.solved && !puzzle.cancelled) {
+            if (puzzle.creator != address(0) && !puzzle.solved && !puzzle.cancelled && !puzzle.forfeited) {
                 assert(puzzle.bounty >= 0.001 ether);
             }
         }
@@ -162,15 +178,36 @@ contract GuessGameInvariants is Test {
     }
 
     /**
-     * @notice A puzzle cannot be both solved and cancelled
+     * @notice A puzzle can only be in one terminal state: solved, cancelled, or forfeited
      */
-    function invariant_solvedOrCancelledMutuallyExclusive() public view {
+    function invariant_terminalStatesMutuallyExclusive() public view {
         uint256 puzzleCount = game.puzzleCount();
 
         for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
-            // A puzzle cannot be both solved AND cancelled
-            assert(!(puzzle.solved && puzzle.cancelled));
+            // Count how many terminal states are true
+            uint256 terminalCount = 0;
+            if (puzzle.solved) terminalCount++;
+            if (puzzle.cancelled) terminalCount++;
+            if (puzzle.forfeited) terminalCount++;
+
+            // At most one terminal state should be true
+            assert(terminalCount <= 1);
+        }
+    }
+
+    /**
+     * @notice Forfeited puzzles should have pendingAtForfeit set
+     */
+    function invariant_forfeitedPuzzlesHavePendingAtForfeit() public view {
+        uint256 puzzleCount = game.puzzleCount();
+
+        for (uint256 i = 0; i < puzzleCount; i++) {
+            IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
+            if (puzzle.forfeited) {
+                // pendingAtForfeit should be > 0 (there was at least one timed-out challenge)
+                assert(puzzle.pendingAtForfeit > 0);
+            }
         }
     }
 }

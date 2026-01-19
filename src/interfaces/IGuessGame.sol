@@ -6,12 +6,14 @@ interface IGuessGame {
         address creator;
         bool solved;
         bool cancelled;
+        bool forfeited;
         bytes32 commitment;
         uint256 bounty;
         uint256 stakeRequired;
         uint256 challengeCount;
         uint256 pendingChallenges;
         uint256 lastChallengeTimestamp;
+        uint256 pendingAtForfeit;
     }
 
     struct Challenge {
@@ -28,12 +30,15 @@ interface IGuessGame {
     event ChallengeResponded(uint256 indexed challengeId, bool correct);
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
     event PuzzleCancelled(uint256 indexed puzzleId);
+    event PuzzleForfeited(uint256 indexed puzzleId);
+    event ForfeitClaimed(uint256 indexed puzzleId, uint256 indexed challengeId, address guesser, uint256 amount);
 
     // Errors
     error InsufficientBounty();
     error InsufficientStake();
     error PuzzleAlreadySolved();
     error PuzzleCancelledError();
+    error PuzzleForfeitedError();
     error ChallengeAlreadyResponded();
     error OnlyPuzzleCreator();
     error InvalidProof();
@@ -44,6 +49,9 @@ interface IGuessGame {
     error HasPendingChallenges();
     error CancelTooSoon();
     error TransferFailed();
+    error NoTimedOutChallenge();
+    error NotYourChallenge();
+    error PuzzleNotForfeited();
 
     // Functions
     function createPuzzle(
@@ -85,7 +93,25 @@ interface IGuessGame {
      */
     function cancelPuzzle(uint256 puzzleId) external;
 
+    /**
+     * @notice Forfeit a puzzle when creator hasn't responded to a challenge in time
+     * @param puzzleId The puzzle to forfeit
+     * @param timedOutChallengeId A challenge that has timed out (for verification)
+     * @dev Callable by anyone. Requires at least one challenge to have timed out.
+     *      After forfeit, all pending guessers can claim their stake + share of bounty.
+     */
+    function forfeitPuzzle(uint256 puzzleId, uint256 timedOutChallengeId) external;
+
+    /**
+     * @notice Claim stake and bounty share from a forfeited puzzle
+     * @param puzzleId The forfeited puzzle
+     * @param challengeId The challenge to claim for
+     * @dev Only callable by the guesser of the challenge. Only for pending challenges.
+     */
+    function claimFromForfeited(uint256 puzzleId, uint256 challengeId) external;
+
     function CANCEL_TIMEOUT() external view returns (uint256);
+    function RESPONSE_TIMEOUT() external view returns (uint256);
 
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
     function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory);

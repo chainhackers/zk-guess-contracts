@@ -13,6 +13,7 @@ contract GuessGame is IGuessGame {
 
     uint256 constant MIN_BOUNTY = 0.001 ether;
     uint256 public constant CANCEL_TIMEOUT = 1 days;
+    uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
     constructor(address _verifier) {
         if (_verifier == address(0)) revert InvalidVerifierAddress();
@@ -30,12 +31,14 @@ contract GuessGame is IGuessGame {
             creator: msg.sender,
             solved: false,
             cancelled: false,
+            forfeited: false,
             commitment: commitment,
             bounty: msg.value,
             stakeRequired: stakeRequired,
             challengeCount: 0,
             pendingChallenges: 0,
-            lastChallengeTimestamp: 0
+            lastChallengeTimestamp: 0,
+            pendingAtForfeit: 0
         });
 
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
@@ -49,6 +52,7 @@ contract GuessGame is IGuessGame {
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (puzzle.cancelled) revert PuzzleCancelledError();
+        if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
 
         challengeId = puzzle.challengeCount++;
@@ -79,6 +83,7 @@ contract GuessGame is IGuessGame {
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (puzzle.cancelled) revert PuzzleCancelledError();
+        if (puzzle.forfeited) revert PuzzleForfeitedError();
 
         Challenge storage challenge = puzzleChallenges[puzzleId][challengeId];
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
@@ -121,6 +126,7 @@ contract GuessGame is IGuessGame {
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (puzzle.cancelled) revert PuzzleCancelledError();
+        if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (puzzle.pendingChallenges > 0) revert HasPendingChallenges();
         // Can only cancel if no challenges yet, or timeout has passed since last challenge
         if (puzzle.lastChallengeTimestamp != 0 && block.timestamp < puzzle.lastChallengeTimestamp + CANCEL_TIMEOUT) {
@@ -133,6 +139,50 @@ contract GuessGame is IGuessGame {
 
         // Return bounty to creator
         (bool success,) = puzzle.creator.call{value: puzzle.bounty}("");
+        if (!success) revert TransferFailed();
+    }
+
+    function forfeitPuzzle(uint256 puzzleId, uint256 timedOutChallengeId) external {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (puzzle.solved) revert PuzzleAlreadySolved();
+        if (puzzle.cancelled) revert PuzzleCancelledError();
+        if (puzzle.forfeited) revert PuzzleForfeitedError();
+
+        // Verify the provided challenge has timed out
+        Challenge storage challenge = puzzleChallenges[puzzleId][timedOutChallengeId];
+        if (challenge.guesser == address(0)) revert ChallengeNotFound();
+        if (challenge.responded) revert ChallengeAlreadyResponded();
+        if (block.timestamp < challenge.timestamp + RESPONSE_TIMEOUT) revert NoTimedOutChallenge();
+
+        // Mark puzzle as forfeited
+        puzzle.forfeited = true;
+        puzzle.pendingAtForfeit = puzzle.pendingChallenges;
+
+        emit PuzzleForfeited(puzzleId);
+    }
+
+    function claimFromForfeited(uint256 puzzleId, uint256 challengeId) external {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (!puzzle.forfeited) revert PuzzleNotForfeited();
+
+        Challenge storage challenge = puzzleChallenges[puzzleId][challengeId];
+        if (challenge.guesser == address(0)) revert ChallengeNotFound();
+        if (msg.sender != challenge.guesser) revert NotYourChallenge();
+        if (challenge.responded) revert ChallengeAlreadyResponded();
+
+        // Mark as responded to prevent double claim
+        challenge.responded = true;
+        puzzle.pendingChallenges--;
+
+        // Calculate payout: stake + proportional share of bounty
+        uint256 bountyShare = puzzle.bounty / puzzle.pendingAtForfeit;
+        uint256 totalPayout = challenge.stake + bountyShare;
+
+        emit ForfeitClaimed(puzzleId, challengeId, msg.sender, totalPayout);
+
+        (bool success,) = msg.sender.call{value: totalPayout}("");
         if (!success) revert TransferFailed();
     }
 
