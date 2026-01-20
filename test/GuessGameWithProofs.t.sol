@@ -911,17 +911,15 @@ contract GuessGameWithProofsTest is Test {
     // ============ Protocol Hole Tests (These SHOULD FAIL until fixed) ============
 
     /**
-     * @notice PROTOCOL HOLE: Stakes get stuck when puzzle is solved with pending challenges
+     * @notice Test that guessers can recover stakes when puzzle is solved with pending challenges
      *
      * Scenario:
      * 1. Guesser A submits correct guess (42)
      * 2. Guesser B submits wrong guess (50)
      * 3. Creator responds to A first → puzzle solved, A wins
-     * 4. Guesser B's stake SHOULD be recoverable
-     *
-     * This test asserts the CORRECT behavior - it will FAIL until the bug is fixed.
+     * 4. Guesser B can call claimStakeFromSolved to recover their stake
      */
-    function test_HOLE_StakesStuckWhenPuzzleSolvedWithPendingChallenges() public {
+    function test_ClaimStakeFromSolved() public {
         // Create puzzle
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
@@ -935,7 +933,7 @@ contract GuessGameWithProofsTest is Test {
 
         // Guesser 2 submits wrong guess (50)
         vm.prank(guesser2);
-        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
 
         // Creator responds to guesser 1 (correct) - puzzle is solved
         vm.prank(creator);
@@ -951,13 +949,24 @@ contract GuessGameWithProofsTest is Test {
         // Guesser 1 wins bounty + stake
         assertEq(guesser.balance, guesser1Start + 0.1 ether);
 
-        // CORRECT BEHAVIOR: Guesser 2 should get their stake back
-        // Currently FAILS because stake is stuck
+        // Puzzle is solved, guesser 2's challenge is still pending
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.solved, true);
+        assertEq(puzzle.pendingChallenges, 1);
+
+        // Guesser 2 claims their stake back
+        vm.prank(guesser2);
+        game.claimStakeFromSolved(puzzleId, challengeId2);
+
+        // Guesser 2 should have their stake returned
         assertEq(guesser2.balance, guesser2Start, "Guesser 2 should have stake returned");
 
-        // CORRECT BEHAVIOR: Contract should have no funds left
-        // Currently FAILS because 0.01 ether is stuck
+        // Contract should have no funds left
         assertEq(address(game).balance, 0, "Contract should have no stuck funds");
+
+        // Challenge should be marked as responded
+        IGuessGame.Challenge memory c2 = game.getChallenge(puzzleId, challengeId2);
+        assertEq(c2.responded, true);
     }
 
     /**

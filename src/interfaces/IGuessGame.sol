@@ -32,6 +32,7 @@ interface IGuessGame {
     event PuzzleCancelled(uint256 indexed puzzleId);
     event PuzzleForfeited(uint256 indexed puzzleId);
     event ForfeitClaimed(uint256 indexed puzzleId, uint256 indexed challengeId, address guesser, uint256 amount);
+    event StakeClaimedFromSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address guesser, uint256 stake);
 
     // Errors
     error InsufficientBounty();
@@ -53,6 +54,7 @@ interface IGuessGame {
     error NoTimedOutChallenge();
     error NotYourChallenge();
     error PuzzleNotForfeited();
+    error PuzzleNotSolved();
 
     // Functions
     function createPuzzle(
@@ -110,6 +112,15 @@ interface IGuessGame {
      * @dev Only callable by the guesser of the challenge. Only for pending challenges.
      */
     function claimFromForfeited(uint256 puzzleId, uint256 challengeId) external;
+
+    /**
+     * @notice Claim stake back from a solved puzzle
+     * @param puzzleId The solved puzzle
+     * @param challengeId The challenge to claim stake for
+     * @dev Only callable by the guesser of the challenge. Only for pending (unresponded) challenges.
+     *      When a puzzle is solved, other guessers can reclaim their stakes.
+     */
+    function claimStakeFromSolved(uint256 puzzleId, uint256 challengeId) external;
 
     function CANCEL_TIMEOUT() external view returns (uint256);
     function RESPONSE_TIMEOUT() external view returns (uint256);

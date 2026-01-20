@@ -188,6 +188,28 @@ contract GuessGame is IGuessGame {
         if (!success) revert TransferFailed();
     }
 
+    function claimStakeFromSolved(uint256 puzzleId, uint256 challengeId) external {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (!puzzle.solved) revert PuzzleNotSolved();
+
+        Challenge storage challenge = puzzleChallenges[puzzleId][challengeId];
+        if (challenge.guesser == address(0)) revert ChallengeNotFound();
+        if (msg.sender != challenge.guesser) revert NotYourChallenge();
+        if (challenge.responded) revert ChallengeAlreadyResponded();
+
+        // Mark as responded to prevent double claim
+        challenge.responded = true;
+        puzzle.pendingChallenges--;
+
+        uint256 stake = challenge.stake;
+
+        emit StakeClaimedFromSolved(puzzleId, challengeId, msg.sender, stake);
+
+        (bool success,) = msg.sender.call{value: stake}("");
+        if (!success) revert TransferFailed();
+    }
+
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory) {
         return puzzles[puzzleId];
     }
