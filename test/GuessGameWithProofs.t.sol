@@ -1114,7 +1114,7 @@ contract GuessGameWithProofsTest is Test {
         uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
 
         vm.prank(creator);
-        vm.expectRevert();
+        vm.expectRevert(IGuessGame.CreatorCannotGuess.selector);
         game.submitGuess{value: 0.01 ether}(puzzleId, 42);
     }
 }

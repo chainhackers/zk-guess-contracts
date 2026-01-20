@@ -55,6 +55,7 @@ interface IGuessGame {
     error NotYourChallenge();
     error PuzzleNotForfeited();
     error PuzzleNotSolved();
+    error CreatorCannotGuess();
 
     // Functions
     function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId);

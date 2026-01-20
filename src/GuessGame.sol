@@ -12,6 +12,7 @@ contract GuessGame is IGuessGame {
     mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
 
     uint256 constant MIN_BOUNTY = 0.001 ether;
+    uint256 constant MIN_STAKE = 0.0001 ether;
     uint256 public constant CANCEL_TIMEOUT = 1 days;
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
@@ -47,7 +48,8 @@ contract GuessGame is IGuessGame {
         if (puzzle.solved) revert PuzzleAlreadySolved();
         if (puzzle.cancelled) revert PuzzleCancelledError();
         if (puzzle.forfeited) revert PuzzleForfeitedError();
-        if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
+        if (msg.sender == puzzle.creator) revert CreatorCannotGuess();
+        if (msg.value < puzzle.stakeRequired || msg.value < MIN_STAKE) revert InsufficientStake();
 
         challengeId = puzzle.challengeCount++;
         puzzle.pendingChallenges++;
