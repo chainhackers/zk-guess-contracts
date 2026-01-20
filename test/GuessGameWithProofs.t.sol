@@ -907,4 +907,222 @@ contract GuessGameWithProofsTest is Test {
         assertEq(guesser3.balance, guesser3Start + 0.05 ether);
         assertEq(guesser4.balance, guesser4Start + 0.05 ether);
     }
+
+    // ============ Corner Case / Protocol Hole Tests ============
+
+    /**
+     * @notice PROTOCOL HOLE: Stakes get stuck when puzzle is solved with pending challenges
+     *
+     * Scenario:
+     * 1. Guesser A submits correct guess (42)
+     * 2. Guesser B submits wrong guess (50)
+     * 3. Creator responds to A first → puzzle solved, A wins
+     * 4. Guesser B's stake is STUCK - no way to recover it
+     *    - Can't respond: PuzzleAlreadySolved
+     *    - Can't forfeit: puzzle is solved, not forfeitable
+     *    - Can't claim: puzzle not forfeited
+     */
+    function test_HOLE_StakesStuckWhenPuzzleSolvedWithPendingChallenges() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        uint256 guesser1Start = guesser.balance;
+        uint256 guesser2Start = guesser2.balance;
+        uint256 contractBalanceBefore = address(game).balance;
+
+        // Guesser 1 submits correct guess (42)
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Guesser 2 submits wrong guess (50)
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        // Contract now holds: bounty (0.1) + stake1 (0.01) + stake2 (0.01) = 0.12 ether
+        assertEq(address(game).balance, contractBalanceBefore + 0.02 ether);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 2);
+
+        // Creator responds to guesser 1 (correct) - puzzle is solved
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
+        );
+
+        // Guesser 1 wins bounty + stake
+        assertEq(guesser.balance, guesser1Start + 0.1 ether); // net gain = bounty
+
+        // Puzzle is now solved
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.solved, true);
+        assertEq(puzzle.pendingChallenges, 1); // Guesser 2's challenge still pending!
+
+        // === GUESSER 2's STAKE IS NOW STUCK ===
+
+        // Can't respond - puzzle already solved
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.PuzzleAlreadySolved.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId2,
+            validProofA_incorrect,
+            validProofB_incorrect,
+            validProofC_incorrect,
+            validPubSignals_incorrect
+        );
+
+        // Can't forfeit - puzzle is solved, not forfeitable
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        vm.expectRevert(IGuessGame.PuzzleAlreadySolved.selector);
+        game.forfeitPuzzle(puzzleId, challengeId2);
+
+        // Can't claim from forfeit - puzzle not forfeited
+        vm.prank(guesser2);
+        vm.expectRevert(IGuessGame.PuzzleNotForfeited.selector);
+        game.claimFromForfeited(puzzleId, challengeId2);
+
+        // Guesser 2 lost their stake forever
+        assertEq(guesser2.balance, guesser2Start - 0.01 ether);
+
+        // Contract still holds guesser 2's stake - stuck forever
+        assertEq(address(game).balance, 0.01 ether);
+
+        // Challenge is still marked as not responded
+        IGuessGame.Challenge memory c2 = game.getChallenge(puzzleId, challengeId2);
+        assertEq(c2.responded, false);
+        assertEq(c2.stake, 0.01 ether); // Stake recorded but unrecoverable
+    }
+
+    /**
+     * @notice PROTOCOL HOLE: Bounty dust remains in contract due to integer division rounding
+     *
+     * When bounty is not evenly divisible by number of claimants,
+     * the remainder (dust) is stuck in contract forever.
+     *
+     * Example: 0.1 ether / 3 = 0.0333... ether each
+     * Total paid out: 0.0999... ether
+     * Dust stuck: ~0.000000000000000001 ether (1 wei in this case, more with larger numbers)
+     */
+    function test_HOLE_BountyDustFromRounding() public {
+        // Create puzzle with bounty that won't divide evenly by 3
+        // 0.1 ether = 100000000000000000 wei
+        // 100000000000000000 / 3 = 33333333333333333 wei (with remainder 1)
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Create 3 guessers
+        address guesser3 = makeAddr("guesser3");
+        vm.deal(guesser3, 10 ether);
+
+        uint256 guesser1Start = guesser.balance;
+        uint256 guesser2Start = guesser2.balance;
+        uint256 guesser3Start = guesser3.balance;
+
+        // All 3 submit guesses
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        vm.prank(guesser3);
+        uint256 challengeId3 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        // Contract holds: bounty (0.1) + 3 stakes (0.03) = 0.13 ether
+        assertEq(address(game).balance, 0.13 ether);
+
+        // Forfeit the puzzle
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, challengeId1);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingAtForfeit, 3);
+
+        // Calculate expected bounty share (with truncation)
+        uint256 bounty = 0.1 ether;
+        uint256 bountySharePerGuesser = bounty / 3; // Integer division truncates
+        uint256 totalBountyPaidOut = bountySharePerGuesser * 3;
+        uint256 dustLost = bounty - totalBountyPaidOut;
+
+        // Verify there IS dust (remainder from division)
+        assertGt(dustLost, 0);
+        assertEq(dustLost, 1); // 1 wei in this case
+
+        // All 3 guessers claim
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId, challengeId1);
+
+        vm.prank(guesser2);
+        game.claimFromForfeited(puzzleId, challengeId2);
+
+        vm.prank(guesser3);
+        game.claimFromForfeited(puzzleId, challengeId3);
+
+        // Each guesser got stake + truncated bounty share
+        uint256 expectedPayout = 0.01 ether + bountySharePerGuesser;
+        assertEq(guesser.balance, guesser1Start - 0.01 ether + expectedPayout);
+        assertEq(guesser2.balance, guesser2Start - 0.01 ether + expectedPayout);
+        assertEq(guesser3.balance, guesser3Start - 0.01 ether + expectedPayout);
+
+        // Contract still has dust stuck forever
+        assertEq(address(game).balance, dustLost);
+        assertEq(address(game).balance, 1); // 1 wei stuck
+
+        // No way to recover this dust - no sweep function exists
+    }
+
+    /**
+     * @notice Demonstrates dust accumulates with larger indivisible bounties
+     */
+    function test_HOLE_BountyDustAccumulates() public {
+        // Use a bounty that creates more significant dust
+        // 1 ether / 7 = 142857142857142857 wei each
+        // Total: 142857142857142857 * 7 = 999999999999999999 wei
+        // Dust: 1 wei
+        //
+        // But with 0.123456789 ether / 7:
+        // 123456789000000000 / 7 = 17636684142857142 wei each
+        // Total: 17636684142857142 * 7 = 123456788999999994 wei
+        // Dust: 6 wei
+
+        uint256 bounty = 0.123456789 ether;
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: bounty}(COMMITMENT_42_123, 0.001 ether);
+
+        // Create 7 guessers
+        address[7] memory guessers;
+        uint256[7] memory challengeIds;
+
+        for (uint256 i = 0; i < 7; i++) {
+            guessers[i] = makeAddr(string(abi.encodePacked("guesser", i)));
+            vm.deal(guessers[i], 10 ether);
+            vm.prank(guessers[i]);
+            challengeIds[i] = game.submitGuess{value: 0.001 ether}(puzzleId, 50);
+        }
+
+        // Forfeit
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, challengeIds[0]);
+
+        // All claim
+        for (uint256 i = 0; i < 7; i++) {
+            vm.prank(guessers[i]);
+            game.claimFromForfeited(puzzleId, challengeIds[i]);
+        }
+
+        // Calculate expected dust
+        uint256 bountySharePerGuesser = bounty / 7;
+        uint256 expectedDust = bounty - (bountySharePerGuesser * 7);
+
+        // Verify dust is stuck
+        assertEq(address(game).balance, expectedDust);
+        assertEq(expectedDust, 6); // 6 wei stuck in this case
+    }
 }
