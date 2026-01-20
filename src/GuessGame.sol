@@ -172,6 +172,13 @@ contract GuessGame is IGuessGame {
         uint256 bountyShare = puzzle.bounty / puzzle.pendingAtForfeit;
         uint256 totalPayout = challenge.stake + bountyShare;
 
+        // If this is the last claim, add any remaining dust from rounding
+        if (puzzle.pendingChallenges == 0) {
+            uint256 totalDistributed = bountyShare * puzzle.pendingAtForfeit;
+            uint256 dust = puzzle.bounty - totalDistributed;
+            totalPayout += dust;
+        }
+
         emit ForfeitClaimed(puzzleId, challengeId, msg.sender, totalPayout);
 
         (bool success,) = msg.sender.call{value: totalPayout}("");

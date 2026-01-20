@@ -990,21 +990,25 @@ contract GuessGameWithProofsTest is Test {
     }
 
     /**
-     * @notice PROTOCOL HOLE: Bounty dust remains in contract due to integer division rounding
+     * @notice Test that bounty dust from rounding goes to the last claimant
      *
      * When bounty is not evenly divisible by number of claimants,
-     * the remainder (dust) should NOT be stuck in contract forever.
-     *
-     * This test asserts the CORRECT behavior - it will FAIL until the bug is fixed.
+     * the last claimant receives the remaining dust.
      */
-    function test_HOLE_BountyDustFromRounding() public {
+    function test_BountyDustGoesToLastClaimant() public {
         // Create puzzle with bounty that won't divide evenly by 3
+        // 0.1 ether = 100000000000000000 wei
+        // 100000000000000000 / 3 = 33333333333333333 wei each (1 wei remainder)
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
 
         // Create 3 guessers
         address guesser3 = makeAddr("guesser3");
         vm.deal(guesser3, 10 ether);
+
+        uint256 guesser1Start = guesser.balance;
+        uint256 guesser2Start = guesser2.balance;
+        uint256 guesser3Start = guesser3.balance;
 
         // All 3 submit guesses
         vm.prank(guesser);
@@ -1020,18 +1024,26 @@ contract GuessGameWithProofsTest is Test {
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         game.forfeitPuzzle(puzzleId, challengeId1);
 
-        // All 3 guessers claim
+        // Calculate expected shares
+        uint256 bounty = 0.1 ether;
+        uint256 bountyShare = bounty / 3; // 33333333333333333 wei
+        uint256 dust = bounty - (bountyShare * 3); // 1 wei
+
+        // First two guessers claim - get normal share
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId, challengeId1);
+        assertEq(guesser.balance, guesser1Start + bountyShare); // stake + share - stake = share
 
         vm.prank(guesser2);
         game.claimFromForfeited(puzzleId, challengeId2);
+        assertEq(guesser2.balance, guesser2Start + bountyShare);
 
+        // Last guesser claims - gets share + dust
         vm.prank(guesser3);
         game.claimFromForfeited(puzzleId, challengeId3);
+        assertEq(guesser3.balance, guesser3Start + bountyShare + dust);
 
-        // CORRECT BEHAVIOR: Contract should have no dust remaining
-        // Currently FAILS because 1 wei is stuck due to integer division
+        // Contract should have no funds remaining
         assertEq(address(game).balance, 0, "Contract should have no dust remaining");
     }
 }
