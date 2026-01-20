@@ -1046,4 +1046,75 @@ contract GuessGameWithProofsTest is Test {
         // Contract should have no funds remaining
         assertEq(address(game).balance, 0, "Contract should have no dust remaining");
     }
+
+    // ============ Protocol Issue Tests ============
+
+    /**
+     * @notice Protocol should enforce minimum stake to prevent spam challenges
+     */
+    function test_MinimumStakeRequired() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0);
+
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.InsufficientStake.selector);
+        game.submitGuess{value: 0}(puzzleId, 50);
+    }
+
+    /**
+     * @notice Same guesser can submit multiple challenges (by design)
+     *
+     * This is acceptable because guessers risk their own funds. The "dilution attack"
+     * mentioned in GitHub Issue #10 requires attacker to stake their own funds,
+     * and forfeit is a recovery mechanism, not the intended path.
+     */
+    function test_SameGuesserMultipleChallenges_DesignDecision() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        uint256 guesserStart = guesser.balance;
+
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        vm.prank(guesser);
+        uint256 challengeId3 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        assertEq(guesser.balance, guesserStart - 0.03 ether);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, challengeId1);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingAtForfeit, 3);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId, challengeId1);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId, challengeId2);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId, challengeId3);
+
+        // Guesser gets stakes back + entire bounty
+        assertEq(guesser.balance, guesserStart + 0.1 ether);
+    }
+
+    /**
+     * @notice Creator cannot guess their own puzzle
+     *
+     * Related: GitHub Issue #10 - https://github.com/chainhackers/zk-guess-contracts/issues/10
+     */
+    function test_CreatorCannotSelfGuess() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(creator);
+        vm.expectRevert();
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+    }
 }
