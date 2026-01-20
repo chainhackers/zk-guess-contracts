@@ -192,7 +192,10 @@ contract GuessGameHandler is Test {
         }
     }
 
-    function cancelPuzzle(uint256 puzzleId, uint256 creatorSeed, uint256 timeWarp) public useActor(creators, creatorSeed) {
+    function cancelPuzzle(uint256 puzzleId, uint256 creatorSeed, uint256 timeWarp)
+        public
+        useActor(creators, creatorSeed)
+    {
         if (!_isPuzzleActive(puzzleId)) return;
 
         // Optionally warp time to allow cancellation after timeout

@@ -20,10 +20,7 @@ contract GuessGame is IGuessGame {
         verifier = IGroth16Verifier(_verifier);
     }
 
-    function createPuzzle(
-        bytes32 commitment,
-        uint256 stakeRequired
-    ) external payable returns (uint256 puzzleId) {
+    function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId) {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
 
         puzzleId = puzzleCount++;
@@ -44,10 +41,7 @@ contract GuessGame is IGuessGame {
         emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
     }
 
-    function submitGuess(
-        uint256 puzzleId,
-        uint256 guess
-    ) external payable returns (uint256 challengeId) {
+    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId) {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
@@ -60,11 +54,7 @@ contract GuessGame is IGuessGame {
         puzzle.lastChallengeTimestamp = block.timestamp;
 
         puzzleChallenges[puzzleId][challengeId] = Challenge({
-            guesser: msg.sender,
-            responded: false,
-            guess: guess,
-            stake: msg.value,
-            timestamp: block.timestamp
+            guesser: msg.sender, responded: false, guess: guess, stake: msg.value, timestamp: block.timestamp
         });
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);

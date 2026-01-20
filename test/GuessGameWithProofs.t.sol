@@ -126,7 +126,12 @@ contract GuessGameWithProofsTest is Test {
         // Respond with valid proof showing guess is correct
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, challengeId, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId,
+            challengeId,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
         );
 
         // Verify puzzle is solved
@@ -231,7 +236,12 @@ contract GuessGameWithProofsTest is Test {
         // Respond with correct proof
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, challengeId3, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId,
+            challengeId3,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
         );
 
         // Verify puzzle is solved
@@ -323,7 +333,12 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
         game.respondToChallenge(
-            puzzleId, challengeId, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId,
+            challengeId,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
         );
 
         // Try to respond to challenge for guess 42 with proof for guess 99 - should fail
@@ -387,7 +402,12 @@ contract GuessGameWithProofsTest is Test {
         // Solve puzzle with first guess
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, challengeId1, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId,
+            challengeId1,
+            validProofA_correct,
+            validProofB_correct,
+            validProofC_correct,
+            validPubSignals_correct
         );
 
         // Try to respond to second guess after puzzle is solved

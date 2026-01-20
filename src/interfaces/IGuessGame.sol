@@ -57,15 +57,9 @@ interface IGuessGame {
     error PuzzleNotSolved();
 
     // Functions
-    function createPuzzle(
-        bytes32 commitment,
-        uint256 stakeRequired
-    ) external payable returns (uint256 puzzleId);
+    function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId);
 
-    function submitGuess(
-        uint256 puzzleId,
-        uint256 guess
-    ) external payable returns (uint256 challengeId);
+    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId);
 
     /**
      * @notice Respond to a challenge with a ZK proof
