@@ -12,7 +12,7 @@ contract GuessGame is IGuessGame {
     mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
 
     uint256 constant MIN_BOUNTY = 0.001 ether;
-    uint256 constant MIN_STAKE = 0.0001 ether;
+    uint256 constant MIN_STAKE = 0.00001 ether;
     uint256 public constant CANCEL_TIMEOUT = 1 days;
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
