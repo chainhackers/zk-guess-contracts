@@ -1279,4 +1279,389 @@ contract GuessGameWithProofsTest is Test {
         // Net: +0.05 (puzzle1 share) + 0.2 (puzzle2 bounty) = +0.25
         assertEq(guesser2.balance, guesser2Start + 0.25 ether);
     }
+
+    // ============ Additional Coverage Tests ============
+
+    /**
+     * @notice Multiple guessers claim stakes from a solved puzzle
+     */
+    function test_ClaimStakeFromSolved_MultipleGuessers() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        uint256 guesser1Start = guesser.balance;
+        uint256 guesser2Start = guesser2.balance;
+
+        address guesser3 = makeAddr("guesser3");
+        vm.deal(guesser3, 10 ether);
+        uint256 guesser3Start = guesser3.balance;
+
+        // Three guessers submit - guesser3 will win
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser2);
+        game.submitGuess{value: 0.02 ether}(puzzleId, 99);
+
+        vm.prank(guesser3);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42); // correct
+
+        // Creator responds to guesser3's correct guess first - puzzle solved
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId, 2, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+        );
+
+        // guesser3 wins bounty + stake immediately
+        assertEq(guesser3.balance, guesser3Start + 0.1 ether);
+
+        // Other guessers claim their stakes back
+        vm.prank(guesser);
+        game.claimStakeFromSolved(puzzleId);
+
+        vm.prank(guesser2);
+        game.claimStakeFromSolved(puzzleId);
+
+        assertEq(game.balances(guesser), 0.01 ether);
+        assertEq(game.balances(guesser2), 0.02 ether);
+
+        // Withdraw
+        vm.prank(guesser);
+        game.withdraw();
+        vm.prank(guesser2);
+        game.withdraw();
+
+        assertEq(guesser.balance, guesser1Start);
+        assertEq(guesser2.balance, guesser2Start);
+    }
+
+    /**
+     * @notice Balance accumulates from both forfeit and solved claims
+     */
+    function test_BalanceAccumulates_MixedClaimTypes() public {
+        uint256 guesserStart = guesser.balance;
+
+        // Puzzle 1: Will be forfeited
+        vm.prank(creator);
+        uint256 puzzleId1 = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId1, 50);
+
+        // Puzzle 2: Will be solved by someone else
+        vm.prank(creator);
+        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.02 ether}(puzzleId2, 50);
+
+        vm.prank(guesser2);
+        game.submitGuess{value: 0.01 ether}(puzzleId2, 42); // winner
+
+        // Forfeit puzzle 1
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId1, 0);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId1);
+        // guesser: 0.01 stake + 0.1 bounty = 0.11
+
+        // Solve puzzle 2
+        vm.warp(block.timestamp - game.RESPONSE_TIMEOUT());
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId2, 1, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+        );
+
+        // guesser claims stake from solved puzzle
+        vm.prank(guesser);
+        game.claimStakeFromSolved(puzzleId2);
+        // guesser: adds 0.02 stake
+
+        // Combined balance
+        assertEq(game.balances(guesser), 0.11 ether + 0.02 ether);
+
+        // Single withdraw gets everything
+        vm.prank(guesser);
+        game.withdraw();
+
+        // Net: paid 0.03 stakes, got 0.13 back = +0.10 (bounty from puzzle1)
+        assertEq(guesser.balance, guesserStart + 0.1 ether);
+    }
+
+    /**
+     * @notice Withdraw with zero balance reverts
+     */
+    function test_Withdraw_ZeroBalance() public {
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.NothingToWithdraw.selector);
+        game.withdraw();
+    }
+
+    /**
+     * @notice Second withdraw after first succeeds reverts
+     */
+    function test_Withdraw_MultipleTimes() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId);
+
+        // First withdraw succeeds
+        vm.prank(guesser);
+        game.withdraw();
+
+        // Second withdraw fails
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.NothingToWithdraw.selector);
+        game.withdraw();
+    }
+
+    /**
+     * @notice Guesser with multiple challenges claims all at once from solved puzzle
+     */
+    function test_ClaimStakeFromSolved_GuesserWithMultipleChallenges() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        uint256 guesserStart = guesser.balance;
+
+        // Guesser submits 3 wrong guesses
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.02 ether}(puzzleId, 99);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.03 ether}(puzzleId, 77);
+
+        // guesser2 wins
+        vm.prank(guesser2);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId, 3, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+        );
+
+        // Guesser claims all 3 stakes in one call
+        vm.prank(guesser);
+        game.claimStakeFromSolved(puzzleId);
+
+        assertEq(game.balances(guesser), 0.06 ether); // 0.01 + 0.02 + 0.03
+
+        vm.prank(guesser);
+        game.withdraw();
+
+        assertEq(guesser.balance, guesserStart); // got all stakes back
+    }
+
+    /**
+     * @notice Winner's aggregates are zeroed so they cannot claim
+     */
+    function test_ClaimStakeFromSolved_WinnerCannotClaim() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42); // correct
+
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId, 0, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+        );
+
+        // Winner's aggregates are decremented to 0
+        assertEq(game.guesserStakeTotal(puzzleId, guesser), 0);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 0);
+
+        // Winner tries to claim - nothing to claim
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.NothingToClaim.selector);
+        game.claimStakeFromSolved(puzzleId);
+    }
+
+    /**
+     * @notice Verify aggregates decrement correctly after respondToChallenge
+     */
+    function test_AggregatesDecrementOnResponse() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Guesser submits 2 guesses
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.02 ether}(puzzleId, 99);
+
+        // Check initial aggregates
+        assertEq(game.guesserStakeTotal(puzzleId, guesser), 0.03 ether);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 2);
+
+        // Respond to first challenge
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
+        );
+
+        // Aggregates decremented
+        assertEq(game.guesserStakeTotal(puzzleId, guesser), 0.02 ether);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 1);
+
+        // Respond to second challenge
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            1,
+            validProofA_incorrect_99,
+            validProofB_incorrect_99,
+            validProofC_incorrect_99,
+            validPubSignals_incorrect_99
+        );
+
+        // Aggregates now zero
+        assertEq(game.guesserStakeTotal(puzzleId, guesser), 0);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 0);
+    }
+
+    /**
+     * @notice Cannot claim from unsolved puzzle
+     */
+    function test_ClaimStakeFromSolved_UnsolvedPuzzle() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.PuzzleNotSolved.selector);
+        game.claimStakeFromSolved(puzzleId);
+    }
+
+    /**
+     * @notice Cannot claim from cancelled puzzle
+     */
+    function test_ClaimFromCancelledPuzzle() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        // Cancel immediately (no challenges)
+        vm.prank(creator);
+        game.cancelPuzzle(puzzleId);
+
+        // Cannot claim forfeit
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.PuzzleNotForfeited.selector);
+        game.claimFromForfeited(puzzleId);
+
+        // Cannot claim solved
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.PuzzleNotSolved.selector);
+        game.claimStakeFromSolved(puzzleId);
+    }
+
+    /**
+     * @notice Balance accumulates from multiple forfeited puzzles
+     */
+    function test_BalanceAccumulates_MultipleForfeitedPuzzles() public {
+        uint256 guesserStart = guesser.balance;
+
+        // Create and forfeit 3 puzzles
+        uint256[] memory puzzleIds = new uint256[](3);
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(creator);
+            puzzleIds[i] = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.01 ether);
+
+            vm.prank(guesser);
+            game.submitGuess{value: 0.01 ether}(puzzleIds[i], 50);
+        }
+
+        // Forfeit all
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        for (uint256 i = 0; i < 3; i++) {
+            game.forfeitPuzzle(puzzleIds[i], 0);
+        }
+
+        // Claim from all
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(guesser);
+            game.claimFromForfeited(puzzleIds[i]);
+        }
+
+        // Balance = 3 * (0.01 stake + 0.1 bounty) = 0.33 ether
+        assertEq(game.balances(guesser), 0.33 ether);
+
+        // Single withdraw
+        vm.prank(guesser);
+        game.withdraw();
+
+        // Net gain = 3 * 0.1 bounty = 0.3 ether
+        assertEq(guesser.balance, guesserStart + 0.3 ether);
+    }
+
+    /**
+     * @notice Single guesser on forfeit gets entire bounty
+     */
+    function test_SingleGuesserForfeit_GetsEntireBounty() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.5 ether}(COMMITMENT_42_123, 0.01 ether);
+
+        uint256 guesserStart = guesser.balance;
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId);
+
+        // Gets stake + entire bounty
+        assertEq(game.balances(guesser), 0.01 ether + 0.5 ether);
+
+        vm.prank(guesser);
+        game.withdraw();
+
+        assertEq(guesser.balance, guesserStart + 0.5 ether);
+    }
+
+    /**
+     * @notice Forfeit claim works correctly at MIN_STAKE
+     */
+    function test_MinStake_ForfeitClaim() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0);
+
+        uint256 guesserStart = guesser.balance;
+
+        // Submit at exactly MIN_STAKE
+        vm.prank(guesser);
+        game.submitGuess{value: 0.00001 ether}(puzzleId, 50);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId);
+
+        // Gets MIN_STAKE + entire bounty
+        assertEq(game.balances(guesser), 0.00001 ether + 0.1 ether);
+
+        vm.prank(guesser);
+        game.withdraw();
+
+        assertEq(guesser.balance, guesserStart + 0.1 ether);
+    }
 }
