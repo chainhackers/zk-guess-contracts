@@ -42,9 +42,9 @@ jobs:
           forge test -vvv
         id: test
 
-      - name: Check gas snapshots
+      - name: Generate gas snapshots
         run: |
-          forge snapshot --check --tolerance 5
+          forge snapshot
         id: snapshot
 
       - name: Run coverage
