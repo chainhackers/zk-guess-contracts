@@ -65,11 +65,7 @@ contract GuessGameFuzz is Test {
      * @param numGuessers Number of guessers (1-10)
      * @param stakeSeed Seed for generating varying stake amounts
      */
-    function testFuzz_BountyDistributionDust(
-        uint256 bounty,
-        uint8 numGuessers,
-        uint256 stakeSeed
-    ) public {
+    function testFuzz_BountyDistributionDust(uint256 bounty, uint8 numGuessers, uint256 stakeSeed) public {
         // Bound inputs
         bounty = bound(bounty, MIN_BOUNTY, 100 ether);
         numGuessers = uint8(bound(numGuessers, 1, 10));
@@ -89,11 +85,7 @@ contract GuessGameFuzz is Test {
             uint256 numChallenges = (uint256(keccak256(abi.encode(stakeSeed, i, "count"))) % 3) + 1;
 
             for (uint256 j = 0; j < numChallenges; j++) {
-                uint256 stake = bound(
-                    uint256(keccak256(abi.encode(stakeSeed, i, j))),
-                    MIN_STAKE,
-                    1 ether
-                );
+                uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, j))), MIN_STAKE, 1 ether);
 
                 vm.prank(guessers[i]);
                 game.submitGuess{value: stake}(puzzleId, 50); // Wrong guess
@@ -139,11 +131,7 @@ contract GuessGameFuzz is Test {
      * @param numResponses Number of responses to process
      * @param stakeSeed Seed for varying stakes
      */
-    function testFuzz_AggregateConsistency(
-        uint8 numGuesses,
-        uint8 numResponses,
-        uint256 stakeSeed
-    ) public {
+    function testFuzz_AggregateConsistency(uint8 numGuesses, uint8 numResponses, uint256 stakeSeed) public {
         // Bound inputs
         numGuesses = uint8(bound(numGuesses, 1, 20));
         numResponses = uint8(bound(numResponses, 0, numGuesses));
@@ -162,11 +150,7 @@ contract GuessGameFuzz is Test {
         // Submit guesses
         for (uint256 i = 0; i < numGuesses; i++) {
             uint256 guesserIdx = uint256(keccak256(abi.encode(stakeSeed, i, "guesser"))) % guessers.length;
-            uint256 stake = bound(
-                uint256(keccak256(abi.encode(stakeSeed, i, "stake"))),
-                MIN_STAKE,
-                0.1 ether
-            );
+            uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, "stake"))), MIN_STAKE, 0.1 ether);
 
             vm.prank(guessers[guesserIdx]);
             uint256 challengeId = game.submitGuess{value: stake}(puzzleId, 50);
@@ -218,9 +202,7 @@ contract GuessGameFuzz is Test {
         // Verify aggregates after responses
         for (uint256 i = 0; i < guessers.length; i++) {
             assertEq(
-                game.guesserStakeTotal(puzzleId, guessers[i]),
-                expectedStakes[i],
-                "Stake total mismatch after responses"
+                game.guesserStakeTotal(puzzleId, guessers[i]), expectedStakes[i], "Stake total mismatch after responses"
             );
             assertEq(
                 game.guesserChallengeCount(puzzleId, guessers[i]),
@@ -237,11 +219,7 @@ contract GuessGameFuzz is Test {
      * @param numGuesses Number of guesses
      * @param stakeSeed Seed for stakes
      */
-    function testFuzz_ContractSolvency(
-        uint256 bounty,
-        uint8 numGuesses,
-        uint256 stakeSeed
-    ) public {
+    function testFuzz_ContractSolvency(uint256 bounty, uint8 numGuesses, uint256 stakeSeed) public {
         // Bound inputs
         bounty = bound(bounty, MIN_BOUNTY, 10 ether);
         numGuesses = uint8(bound(numGuesses, 1, 15));
@@ -257,11 +235,7 @@ contract GuessGameFuzz is Test {
         // Submit guesses
         for (uint256 i = 0; i < numGuesses; i++) {
             uint256 guesserIdx = i % guessers.length;
-            uint256 stake = bound(
-                uint256(keccak256(abi.encode(stakeSeed, i))),
-                MIN_STAKE,
-                0.5 ether
-            );
+            uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i))), MIN_STAKE, 0.5 ether);
 
             vm.prank(guessers[guesserIdx]);
             game.submitGuess{value: stake}(puzzleId, 50);
@@ -317,10 +291,7 @@ contract GuessGameFuzz is Test {
      * @param numPuzzles Number of puzzles to create
      * @param bountySeed Seed for bounty amounts
      */
-    function testFuzz_MultiPuzzleBalanceAccumulation(
-        uint8 numPuzzles,
-        uint256 bountySeed
-    ) public {
+    function testFuzz_MultiPuzzleBalanceAccumulation(uint8 numPuzzles, uint256 bountySeed) public {
         numPuzzles = uint8(bound(numPuzzles, 2, 5));
 
         uint256[] memory puzzleIds = new uint256[](numPuzzles);
@@ -328,11 +299,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzles and submit guesses
         for (uint256 i = 0; i < numPuzzles; i++) {
-            uint256 bounty = bound(
-                uint256(keccak256(abi.encode(bountySeed, i))),
-                MIN_BOUNTY,
-                1 ether
-            );
+            uint256 bounty = bound(uint256(keccak256(abi.encode(bountySeed, i))), MIN_BOUNTY, 1 ether);
             bounties[i] = bounty;
 
             vm.prank(creator);
@@ -377,10 +344,7 @@ contract GuessGameFuzz is Test {
      * @param bounty Bounty amount
      * @param numChallenges Number of challenges
      */
-    function testFuzz_BountyShareDivision(
-        uint256 bounty,
-        uint8 numChallenges
-    ) public {
+    function testFuzz_BountyShareDivision(uint256 bounty, uint8 numChallenges) public {
         bounty = bound(bounty, MIN_BOUNTY, 100 ether);
         numChallenges = uint8(bound(numChallenges, 1, 50));
 
@@ -412,10 +376,7 @@ contract GuessGameFuzz is Test {
      * @param bounty Bounty amount
      * @param numGuessers Number of guessers (each with 1 challenge)
      */
-    function testFuzz_EqualDistribution(
-        uint256 bounty,
-        uint8 numGuessers
-    ) public {
+    function testFuzz_EqualDistribution(uint256 bounty, uint8 numGuessers) public {
         bounty = bound(bounty, MIN_BOUNTY, 10 ether);
         numGuessers = uint8(bound(numGuessers, 2, 10));
 
