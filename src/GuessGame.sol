@@ -31,6 +31,7 @@ contract GuessGame is IGuessGame {
 
     function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId) {
         if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
+        if (stakeRequired < MIN_STAKE) revert InsufficientStake();
 
         puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
@@ -57,7 +58,7 @@ contract GuessGame is IGuessGame {
         if (puzzle.cancelled) revert PuzzleCancelledError();
         if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (msg.sender == puzzle.creator) revert CreatorCannotGuess();
-        if (msg.value < puzzle.stakeRequired || msg.value < MIN_STAKE) revert InsufficientStake();
+        if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
 
         challengeId = puzzle.challengeCount++;
         puzzle.pendingChallenges++;
