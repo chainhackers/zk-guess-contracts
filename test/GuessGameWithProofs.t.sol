@@ -1064,15 +1064,12 @@ contract GuessGameWithProofsTest is Test {
     // ============ Protocol Issue Tests ============
 
     /**
-     * @notice Protocol should enforce minimum stake to prevent spam challenges
+     * @notice Protocol should enforce minimum stake at puzzle creation
      */
     function test_MinimumStakeRequired() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0);
-
-        vm.prank(guesser);
         vm.expectRevert(IGuessGame.InsufficientStake.selector);
-        game.submitGuess{value: 0}(puzzleId, 50);
+        game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0);
     }
 
     /**
@@ -1642,7 +1639,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_MinStake_ForfeitClaim() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0);
+        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(COMMITMENT_42_123, 0.00001 ether);
 
         uint256 guesserStart = guesser.balance;
 
