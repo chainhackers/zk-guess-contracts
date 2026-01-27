@@ -41,3 +41,13 @@ jobs:
         run: |
           forge test -vvv
         id: test
+
+      - name: Generate gas snapshots
+        run: |
+          forge snapshot
+        id: snapshot
+
+      - name: Run coverage
+        run: |
+          forge coverage --report summary
+        id: coverage

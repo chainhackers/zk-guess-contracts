@@ -360,29 +360,27 @@ contract GuessGameTest is Test {
 
         // Submit a guess with 0.01 ether stake
         vm.prank(guesser);
-        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Warp and forfeit
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         vm.prank(anyone);
-        game.forfeitPuzzle(puzzleId, challengeId);
+        game.forfeitPuzzle(puzzleId, 0);
 
-        uint256 guesserBalanceBefore = guesser.balance;
-
-        // Claim from forfeited
+        // Claim from forfeited (single call per guesser)
         vm.prank(guesser);
-        game.claimFromForfeited(puzzleId, challengeId);
+        game.claimFromForfeited(puzzleId);
 
-        // Guesser should receive stake (0.01) + bounty share (0.1 / 1 = 0.1) = 0.11 ether
+        // Balance should be credited: stake (0.01) + bounty share (0.1 / 1 = 0.1) = 0.11 ether
+        assertEq(game.balances(guesser), 0.11 ether);
+
+        // Withdraw to receive ETH
+        uint256 guesserBalanceBefore = guesser.balance;
+        vm.prank(guesser);
+        game.withdraw();
+
         assertEq(guesser.balance, guesserBalanceBefore + 0.11 ether);
-
-        // Challenge should be marked as responded
-        IGuessGame.Challenge memory challenge = game.getChallenge(puzzleId, challengeId);
-        assertEq(challenge.responded, true);
-
-        // Pending challenges should be decremented
-        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
-        assertEq(puzzle.pendingChallenges, 0);
+        assertEq(game.balances(guesser), 0);
     }
 
     function test_ClaimFromForfeited_MultipleGuessers() public {
@@ -392,52 +390,61 @@ contract GuessGameTest is Test {
 
         // Two guessers submit
         vm.prank(guesser);
-        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         vm.prank(guesser2);
-        uint256 challengeId2 = game.submitGuess{value: 0.02 ether}(puzzleId, 99);
+        game.submitGuess{value: 0.02 ether}(puzzleId, 99);
 
         // Warp and forfeit using first challenge
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         vm.prank(anyone);
-        game.forfeitPuzzle(puzzleId, challengeId1);
+        game.forfeitPuzzle(puzzleId, 0);
 
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
         assertEq(puzzle.pendingAtForfeit, 2);
 
+        // Both claim (single call per guesser)
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId);
+
+        vm.prank(guesser2);
+        game.claimFromForfeited(puzzleId);
+
+        // Each gets stake + bounty share (0.1 * 1 / 2 = 0.05 ether per challenge)
+        assertEq(game.balances(guesser), 0.01 ether + 0.05 ether);
+        assertEq(game.balances(guesser2), 0.02 ether + 0.05 ether);
+
+        // Withdraw
         uint256 guesser1BalanceBefore = guesser.balance;
         uint256 guesser2BalanceBefore = guesser2.balance;
 
-        // Both claim
         vm.prank(guesser);
-        game.claimFromForfeited(puzzleId, challengeId1);
-
+        game.withdraw();
         vm.prank(guesser2);
-        game.claimFromForfeited(puzzleId, challengeId2);
+        game.withdraw();
 
-        // Each gets stake + 0.1/2 = stake + 0.05 ether bounty share
-        assertEq(guesser.balance, guesser1BalanceBefore + 0.01 ether + 0.05 ether);
-        assertEq(guesser2.balance, guesser2BalanceBefore + 0.02 ether + 0.05 ether);
+        assertEq(guesser.balance, guesser1BalanceBefore + 0.06 ether);
+        assertEq(guesser2.balance, guesser2BalanceBefore + 0.07 ether);
     }
 
-    function test_ClaimFromForfeited_NotYourChallenge() public {
+    function test_ClaimFromForfeited_NothingToClaim() public {
         // Create puzzle
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Guesser submits
         vm.prank(guesser);
-        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Warp and forfeit
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         vm.prank(anyone);
-        game.forfeitPuzzle(puzzleId, challengeId);
+        game.forfeitPuzzle(puzzleId, 0);
 
-        // guesser2 tries to claim guesser's challenge
+        // guesser2 tries to claim but has no challenges
         vm.prank(guesser2);
-        vm.expectRevert(IGuessGame.NotYourChallenge.selector);
-        game.claimFromForfeited(puzzleId, challengeId);
+        vm.expectRevert(IGuessGame.NothingToClaim.selector);
+        game.claimFromForfeited(puzzleId);
     }
 
     function test_ClaimFromForfeited_DoubleClaim() public {
@@ -447,21 +454,21 @@ contract GuessGameTest is Test {
 
         // Submit guess
         vm.prank(guesser);
-        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Warp and forfeit
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         vm.prank(anyone);
-        game.forfeitPuzzle(puzzleId, challengeId);
+        game.forfeitPuzzle(puzzleId, 0);
 
         // Claim once
         vm.prank(guesser);
-        game.claimFromForfeited(puzzleId, challengeId);
+        game.claimFromForfeited(puzzleId);
 
         // Try to claim again
         vm.prank(guesser);
-        vm.expectRevert(IGuessGame.ChallengeAlreadyResponded.selector);
-        game.claimFromForfeited(puzzleId, challengeId);
+        vm.expectRevert(IGuessGame.AlreadyClaimed.selector);
+        game.claimFromForfeited(puzzleId);
     }
 
     function test_ClaimFromForfeited_PuzzleNotForfeited() public {
@@ -471,11 +478,11 @@ contract GuessGameTest is Test {
 
         // Submit guess
         vm.prank(guesser);
-        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Try to claim without forfeit
         vm.prank(guesser);
         vm.expectRevert(IGuessGame.PuzzleNotForfeited.selector);
-        game.claimFromForfeited(puzzleId, challengeId);
+        game.claimFromForfeited(puzzleId);
     }
 }

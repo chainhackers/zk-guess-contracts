@@ -31,8 +31,9 @@ interface IGuessGame {
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
     event PuzzleCancelled(uint256 indexed puzzleId);
     event PuzzleForfeited(uint256 indexed puzzleId);
-    event ForfeitClaimed(uint256 indexed puzzleId, uint256 indexed challengeId, address guesser, uint256 amount);
-    event StakeClaimedFromSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address guesser, uint256 stake);
+    event ForfeitClaimed(uint256 indexed puzzleId, address guesser, uint256 amount);
+    event StakeClaimedFromSolved(uint256 indexed puzzleId, address guesser, uint256 stake);
+    event Withdrawal(address indexed account, uint256 amount);
 
     // Errors
     error InsufficientBounty();
@@ -56,6 +57,8 @@ interface IGuessGame {
     error PuzzleNotForfeited();
     error PuzzleNotSolved();
     error CreatorCannotGuess();
+    error AlreadyClaimed();
+    error NothingToWithdraw();
 
     // Functions
     function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId);
@@ -103,19 +106,21 @@ interface IGuessGame {
     /**
      * @notice Claim stake and bounty share from a forfeited puzzle
      * @param puzzleId The forfeited puzzle
-     * @param challengeId The challenge to claim for
-     * @dev Only callable by the guesser of the challenge. Only for pending challenges.
+     * @dev Single call per guesser. Credits internal balance.
      */
-    function claimFromForfeited(uint256 puzzleId, uint256 challengeId) external;
+    function claimFromForfeited(uint256 puzzleId) external;
 
     /**
      * @notice Claim stake back from a solved puzzle
      * @param puzzleId The solved puzzle
-     * @param challengeId The challenge to claim stake for
-     * @dev Only callable by the guesser of the challenge. Only for pending (unresponded) challenges.
-     *      When a puzzle is solved, other guessers can reclaim their stakes.
+     * @dev Single call per guesser. Credits internal balance.
      */
-    function claimStakeFromSolved(uint256 puzzleId, uint256 challengeId) external;
+    function claimStakeFromSolved(uint256 puzzleId) external;
+
+    /**
+     * @notice Withdraw accumulated balance
+     */
+    function withdraw() external;
 
     function CANCEL_TIMEOUT() external view returns (uint256);
     function RESPONSE_TIMEOUT() external view returns (uint256);
@@ -123,4 +128,5 @@ interface IGuessGame {
     function getPuzzle(uint256 puzzleId) external view returns (Puzzle memory);
     function getChallenge(uint256 puzzleId, uint256 challengeId) external view returns (Challenge memory);
     function puzzleCount() external view returns (uint256);
+    function balances(address account) external view returns (uint256);
 }

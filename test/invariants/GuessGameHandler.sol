@@ -239,29 +239,28 @@ contract GuessGameHandler is Test {
         }
     }
 
-    function claimFromForfeited(uint256 puzzleId, uint256 challengeId, uint256 guesserSeed)
-        public
-        useActor(guessers, guesserSeed)
-    {
+    function claimFromForfeited(uint256 puzzleId, uint256 guesserSeed) public useActor(guessers, guesserSeed) {
         if (!ghostPuzzleForfeited[puzzleId]) return;
 
-        try game.getChallenge(puzzleId, challengeId) returns (IGuessGame.Challenge memory challenge) {
-            if (challenge.guesser != guessers[guesserSeed % guessers.length]) return;
-            if (challenge.responded) return;
+        address guesser = guessers[guesserSeed % guessers.length];
 
-            try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
-                uint256 bountyShare = puzzle.bounty / puzzle.pendingAtForfeit;
-                uint256 totalPayout = challenge.stake + bountyShare;
+        try game.getPuzzle(puzzleId) returns (IGuessGame.Puzzle memory puzzle) {
+            // Get guesser's stake and challenge count
+            uint256 myStake = game.guesserStakeTotal(puzzleId, guesser);
+            uint256 myChallenges = game.guesserChallengeCount(puzzleId, guesser);
 
-                try game.claimFromForfeited(puzzleId, challengeId) {
-                    // Update ghost variables
-                    ghostPuzzlePendingStakes[puzzleId] -= challenge.stake;
-                    ghostTotalContractFunds -= totalPayout;
-                } catch {
-                    // Ignore reverts
-                }
+            if (myChallenges == 0) return;
+            if (game.guesserClaimed(puzzleId, guesser)) return;
+
+            uint256 bountyShare = (puzzle.bounty * myChallenges) / puzzle.pendingAtForfeit;
+            uint256 totalPayout = myStake + bountyShare;
+
+            try game.claimFromForfeited(puzzleId) {
+                // Update ghost variables - credits internal balance, doesn't transfer yet
+                ghostPuzzlePendingStakes[puzzleId] -= myStake;
+                // Note: ghostTotalContractFunds stays same until withdraw
             } catch {
-                // Ignore
+                // Ignore reverts
             }
         } catch {
             // Ignore
