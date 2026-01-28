@@ -1739,12 +1739,7 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to challenge 0 only
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            0,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            puzzleId, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
         );
 
         // Warp and forfeit using challenge 1
