@@ -1,0 +1,12 @@
+{
+  "name": "zk-guess-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "generate-proof": "node scripts/generate-proof.js"
+  },
+  "dependencies": {
+    "snarkjs": "^0.7.5",
+    "circomlibjs": "^0.1.7"
+  }
+}
