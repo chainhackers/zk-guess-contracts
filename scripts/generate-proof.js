@@ -67,6 +67,9 @@ async function main() {
 
   // Output as JSON
   console.log(JSON.stringify(solidityProof));
+
+  // Exit explicitly - snarkjs uses workers that keep event loop alive
+  process.exit(0);
 }
 
 main().catch((err) => {

@@ -21,12 +21,7 @@ abstract contract ProofGenerator is Test {
      */
     function generateProof(uint256 secret, uint256 salt, uint256 guess)
         internal
-        returns (
-            uint256[2] memory pA,
-            uint256[2][2] memory pB,
-            uint256[2] memory pC,
-            uint256[3] memory pubSignals
-        )
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[3] memory pubSignals)
     {
         // Build FFI command
         string[] memory inputs = new string[](5);
@@ -71,7 +66,7 @@ abstract contract ProofGenerator is Test {
      */
     function computeCommitment(uint256 secret, uint256 salt) internal returns (bytes32 commitment) {
         // Generate proof just to get the commitment from pubSignals
-        (,, , uint256[3] memory pubSignals) = generateProof(secret, salt, 0);
+        (,,, uint256[3] memory pubSignals) = generateProof(secret, salt, 0);
         return bytes32(pubSignals[0]);
     }
 }
