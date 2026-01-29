@@ -13,12 +13,14 @@ contract GuessGameTest is Test {
     address guesser;
     address guesser2;
     address anyone;
+    address treasury;
 
     function setUp() public {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
         anyone = makeAddr("anyone");
+        treasury = makeAddr("treasury");
 
         vm.deal(creator, 10 ether);
         vm.deal(guesser, 10 ether);
@@ -27,8 +29,8 @@ contract GuessGameTest is Test {
 
         // Deploy verifier first
         verifier = new Groth16Verifier();
-        // Deploy game with verifier address
-        game = new GuessGame(address(verifier));
+        // Deploy game with verifier address and treasury
+        game = new GuessGame(address(verifier), treasury);
     }
 
     function test_CreatePuzzle() public {
@@ -37,7 +39,7 @@ contract GuessGameTest is Test {
         bytes32 commitment = keccak256(abi.encodePacked(uint256(42), uint256(123))); // number=42, salt=123
         uint256 stakeRequired = 0.01 ether;
 
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(commitment, stakeRequired);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, stakeRequired);
 
         assertEq(puzzleId, 0);
         assertEq(game.puzzleCount(), 1);
@@ -46,6 +48,7 @@ contract GuessGameTest is Test {
         assertEq(puzzle.creator, creator);
         assertEq(puzzle.commitment, commitment);
         assertEq(puzzle.bounty, 0.1 ether);
+        assertEq(puzzle.collateral, 0.1 ether);
         assertEq(puzzle.stakeRequired, stakeRequired);
         assertEq(puzzle.solved, false);
         assertEq(puzzle.cancelled, false);
@@ -63,8 +66,9 @@ contract GuessGameTest is Test {
 
         bytes32 commitment = keccak256(abi.encodePacked(uint256(42), uint256(123)));
 
+        // Now requires 2x MIN_BOUNTY (0.002 ether), so 0.001 ether is insufficient
         vm.expectRevert(IGuessGame.InsufficientBounty.selector);
-        game.createPuzzle{value: 0.0001 ether}(commitment, 0.01 ether);
+        game.createPuzzle{value: 0.001 ether}(commitment, 0.01 ether);
 
         vm.stopPrank();
     }
@@ -73,7 +77,7 @@ contract GuessGameTest is Test {
         // First create a puzzle
         vm.prank(creator);
         uint256 puzzleId =
-            game.createPuzzle{value: 0.1 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
+            game.createPuzzle{value: 0.2 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
 
         // Submit a guess
         vm.startPrank(guesser);
@@ -106,7 +110,7 @@ contract GuessGameTest is Test {
         // Create puzzle with 0.01 ether stake requirement
         vm.prank(creator);
         uint256 puzzleId =
-            game.createPuzzle{value: 0.1 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
+            game.createPuzzle{value: 0.2 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
 
         vm.startPrank(guesser);
 
@@ -120,7 +124,7 @@ contract GuessGameTest is Test {
         // Create puzzle
         vm.prank(creator);
         uint256 puzzleId =
-            game.createPuzzle{value: 0.1 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
+            game.createPuzzle{value: 0.2 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
 
         // Cancel it
         vm.prank(creator);
@@ -141,7 +145,7 @@ contract GuessGameTest is Test {
         // Create puzzle and submit guess
         vm.prank(creator);
         uint256 puzzleId =
-            game.createPuzzle{value: 0.1 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
+            game.createPuzzle{value: 0.2 ether}(keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.01 ether);
 
         vm.prank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
@@ -163,7 +167,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Check creator balance before cancelling
         uint256 creatorBalanceBefore = creator.balance;
@@ -172,8 +176,8 @@ contract GuessGameTest is Test {
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
-        // Creator should receive bounty back
-        assertEq(creator.balance, creatorBalanceBefore + 0.1 ether);
+        // Creator should receive bounty + collateral back (0.2 ether total)
+        assertEq(creator.balance, creatorBalanceBefore + 0.2 ether);
 
         // Verify puzzle is cancelled
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
@@ -183,7 +187,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle_HasPendingChallenges() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -198,7 +202,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle_OnlyCreator() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Try to cancel as non-creator
         vm.prank(guesser);
@@ -209,7 +213,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle_NoChallenges_ImmediateCancel() public {
         // Create puzzle with no challenges - should be able to cancel immediately
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         uint256 creatorBalanceBefore = creator.balance;
 
@@ -217,13 +221,14 @@ contract GuessGameTest is Test {
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
-        assertEq(creator.balance, creatorBalanceBefore + 0.1 ether);
+        // Gets bounty + collateral back
+        assertEq(creator.balance, creatorBalanceBefore + 0.2 ether);
     }
 
     function test_CancelPuzzle_CancelTooSoon() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess (creates lastChallengeTimestamp)
         vm.prank(guesser);
@@ -241,7 +246,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle_AfterTimeout() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -271,7 +276,7 @@ contract GuessGameTest is Test {
     function test_ForfeitPuzzle_Success() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -293,7 +298,7 @@ contract GuessGameTest is Test {
     function test_ForfeitPuzzle_TooEarly() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -316,7 +321,7 @@ contract GuessGameTest is Test {
     function test_SubmitGuess_PuzzleForfeited() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -336,7 +341,7 @@ contract GuessGameTest is Test {
     function test_CancelPuzzle_PuzzleForfeited() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess
         vm.prank(guesser);
@@ -356,7 +361,7 @@ contract GuessGameTest is Test {
     function test_ClaimFromForfeited_Success() public {
         // Create puzzle with 0.1 ether bounty
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit a guess with 0.01 ether stake
         vm.prank(guesser);
@@ -386,7 +391,7 @@ contract GuessGameTest is Test {
     function test_ClaimFromForfeited_MultipleGuessers() public {
         // Create puzzle with 0.1 ether bounty
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Two guessers submit
         vm.prank(guesser);
@@ -430,7 +435,7 @@ contract GuessGameTest is Test {
     function test_ClaimFromForfeited_NothingToClaim() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Guesser submits
         vm.prank(guesser);
@@ -450,7 +455,7 @@ contract GuessGameTest is Test {
     function test_ClaimFromForfeited_DoubleClaim() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit guess
         vm.prank(guesser);
@@ -474,7 +479,7 @@ contract GuessGameTest is Test {
     function test_ClaimFromForfeited_PuzzleNotForfeited() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.1 ether}(bytes32(uint256(1)), 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
 
         // Submit guess
         vm.prank(guesser);
@@ -484,5 +489,195 @@ contract GuessGameTest is Test {
         vm.prank(guesser);
         vm.expectRevert(IGuessGame.PuzzleNotForfeited.selector);
         game.claimFromForfeited(puzzleId);
+    }
+
+    // ============ Collateral Tests ============
+
+    function test_CreatePuzzleWithCollateral() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+
+        // Verify 1:1 split
+        assertEq(puzzle.bounty, 0.1 ether);
+        assertEq(puzzle.collateral, 0.1 ether);
+    }
+
+    function test_CreatePuzzleWithOddAmount() public {
+        // Test odd amount - extra wei should go to bounty
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.201 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+
+        // collateral = 0.201 / 2 = 0.1005 ether
+        // bounty = 0.201 - 0.1005 = 0.1005 ether
+        assertEq(puzzle.collateral, 0.1005 ether);
+        assertEq(puzzle.bounty, 0.1005 ether);
+    }
+
+    function test_CannotSubmitDuplicateGuess() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        // First guess succeeds
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Same guess from different guesser should fail
+        vm.prank(guesser2);
+        vm.expectRevert(IGuessGame.GuessAlreadySubmitted.selector);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Same guesser with same guess should also fail
+        vm.prank(guesser);
+        vm.expectRevert(IGuessGame.GuessAlreadySubmitted.selector);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+    }
+
+    function test_CanSubmitDifferentGuesses() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        // Different guesses should succeed
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        vm.prank(guesser2);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 43);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 44);
+
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.challengeCount, 3);
+        assertEq(puzzle.pendingChallenges, 3);
+    }
+
+    function test_CancelReturnsCollateral() public {
+        uint256 creatorBalanceBefore = creator.balance;
+
+        // Create puzzle with 0.2 ether (0.1 bounty + 0.1 collateral)
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        assertEq(creator.balance, creatorBalanceBefore - 0.2 ether);
+
+        // Cancel puzzle
+        vm.prank(creator);
+        game.cancelPuzzle(puzzleId);
+
+        // Creator gets bounty + collateral back (0.2 ether total)
+        assertEq(creator.balance, creatorBalanceBefore);
+    }
+
+    function test_ForfeitSlashesCollateralToTreasury() public {
+        uint256 treasuryBalanceBefore = treasury.balance;
+
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        // Submit a guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Warp time and forfeit
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        vm.prank(anyone);
+        game.forfeitPuzzle(puzzleId, challengeId);
+
+        // Treasury should receive collateral (0.1 ether)
+        assertEq(treasury.balance, treasuryBalanceBefore + 0.1 ether);
+    }
+
+    function test_ForfeitEmitsCollateralSlashedEvent() public {
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+
+        vm.expectEmit(true, false, false, true);
+        emit IGuessGame.CollateralSlashed(puzzleId, 0.1 ether);
+
+        vm.prank(anyone);
+        game.forfeitPuzzle(puzzleId, challengeId);
+    }
+
+    function test_ForfeitRevertsIfTreasuryRejects() public {
+        // Deploy game with reverting treasury
+        RejectingReceiver badTreasury = new RejectingReceiver();
+        GuessGame gameWithBadTreasury = new GuessGame(address(verifier), address(badTreasury));
+
+        vm.prank(creator);
+        uint256 puzzleId = gameWithBadTreasury.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        vm.prank(guesser);
+        uint256 challengeId = gameWithBadTreasury.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        vm.warp(block.timestamp + gameWithBadTreasury.RESPONSE_TIMEOUT() + 1);
+
+        vm.expectRevert(IGuessGame.TransferFailed.selector);
+        vm.prank(anyone);
+        gameWithBadTreasury.forfeitPuzzle(puzzleId, challengeId);
+    }
+
+    function test_MultiplePuzzlesForfeit_CollateralIsolated() public {
+        uint256 treasuryBalanceBefore = treasury.balance;
+
+        // Create 3 puzzles with different bounties
+        vm.prank(creator);
+        uint256 puzzle1 = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether); // 0.1 collateral
+        vm.prank(creator);
+        uint256 puzzle2 = game.createPuzzle{value: 0.4 ether}(bytes32(uint256(2)), 0.01 ether); // 0.2 collateral
+        vm.prank(creator);
+        uint256 puzzle3 = game.createPuzzle{value: 0.6 ether}(bytes32(uint256(3)), 0.01 ether); // 0.3 collateral
+
+        // Submit guesses to all 3
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzle1, 10);
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzle2, 20);
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzle3, 30);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+
+        // Forfeit only puzzle2
+        vm.prank(anyone);
+        game.forfeitPuzzle(puzzle2, 0);
+
+        // Treasury gets exactly puzzle2's collateral (0.2 ether)
+        assertEq(treasury.balance, treasuryBalanceBefore + 0.2 ether);
+
+        // Puzzle1 and puzzle3 collateral unchanged
+        assertEq(game.getPuzzle(puzzle1).collateral, 0.1 ether);
+        assertEq(game.getPuzzle(puzzle3).collateral, 0.3 ether);
+        assertFalse(game.getPuzzle(puzzle1).forfeited);
+        assertFalse(game.getPuzzle(puzzle3).forfeited);
+    }
+
+    function test_CancelDoesNotSlashCollateral() public {
+        uint256 treasuryBefore = treasury.balance;
+
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether);
+
+        vm.prank(creator);
+        game.cancelPuzzle(puzzleId);
+
+        assertEq(treasury.balance, treasuryBefore);
+    }
+}
+
+contract RejectingReceiver {
+    receive() external payable {
+        revert("rejected");
     }
 }

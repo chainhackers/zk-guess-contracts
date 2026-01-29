@@ -13,6 +13,7 @@ import "../../src/generated/GuessVerifier.sol";
 contract GuessGameHandler is Test {
     GuessGame public immutable game;
     Groth16Verifier public immutable verifier;
+    address public immutable treasury;
 
     // Ghost variables for tracking state
     mapping(uint256 => bool) public ghostPuzzleExists;
@@ -20,8 +21,14 @@ contract GuessGameHandler is Test {
     mapping(uint256 => bool) public ghostPuzzleCancelled;
     mapping(uint256 => bool) public ghostPuzzleForfeited;
     mapping(uint256 => uint256) public ghostPuzzleBounty; // bounty per puzzle
+    mapping(uint256 => uint256) public ghostPuzzleCollateral; // collateral per puzzle
     mapping(uint256 => uint256) public ghostPuzzlePendingStakes; // sum of pending stakes per puzzle
     uint256 public ghostTotalContractFunds;
+    uint256 public ghostTreasuryReceived; // total ETH sent to treasury
+    mapping(uint256 => address) public ghostPuzzleCreator; // creator per puzzle
+
+    // Track unique guesses per puzzle to avoid duplicate revert
+    mapping(uint256 => uint256) public nextGuessNumber;
 
     // Actors
     address[] public creators;
@@ -34,49 +41,50 @@ contract GuessGameHandler is Test {
     uint256 constant MAX_BOUNTY = 10 ether;
 
     // Valid proofs for testing (from actual circuit)
-    uint256[2] validProofA_correct = [
-        20733104445222474913460899055922638733390515415268774731643134142498872084191,
-        14000468808382636465462761302394038173719213862863751644422554851223456811411
+    uint256[2] validProofACorrect = [
+        11504940021775654723396425733285520171636083270569085996696638875572788294702,
+        20637774454469044945452272765979331202451395558074875764295247503932702604629
     ];
-    uint256[2][2] validProofB_correct = [
+    uint256[2][2] validProofBCorrect = [
         [
-            14529324359401080920218683234881556919213052277135946418796017114639319774385,
-            12129083737057255635218975576710777788141717515839459178762095078342656790038
+            19724327737928428067436744771566894225255546895126133643853596733661323080944,
+            13492609421459766523740584888043360210859595830002357517875974051598571449631
         ],
         [
-            4006130398494418696741732007622629431845312574338850368957129174821663088541,
-            5320382245369139568202711526684359871618209808068963385672210545364024687600
+            9101346022506809922940675743405360969490706785433757256514522858631885651223,
+            12264233282322348000730820238906876741351433565392606730751196784147109643754
         ]
     ];
-    uint256[2] validProofC_correct = [
-        11555678601106434654959630063997038302724273931564919993607610338934924583422,
-        12395595758571672800576038452878068084738676055843400774526791354550122500902
+    uint256[2] validProofCCorrect = [
+        17615922777476637143563646924700485140840791473300702105604187277711362783877,
+        3483001149425582467351102259969255865622028834738135840359710692864323177598
     ];
 
-    uint256[2] validProofA_incorrect = [
-        260224852269514550962255596791713148069192103530930225168509498623216740997,
-        3464936673232863366747749560095954607406672448198506930195439109614243395305
+    uint256[2] validProofAIncorrect = [
+        17668304494923110155110008244216636870940265447331590922567454459053815694304,
+        13683766786964868367848848655586138024784872326513979640650673946629532736401
     ];
-    uint256[2][2] validProofB_incorrect = [
+    uint256[2][2] validProofBIncorrect = [
         [
-            18076787037990225159899307248733301104058781270403724423075272532649526747523,
-            21163582130445499238873337568384386692136208661991064222861763232945956209076
+            1945857558955814391241731181179539082141059668772203558278829707457186200701,
+            12053699461649061725393751797387552055526376190469242430549646015289936822082
         ],
         [
-            14700551543044113104786011479044690264965500866720142037325671448170897252180,
-            248536395010580566114959855988956594661021088223112251086687402479116093507
+            20996945187651455596783162227378312257353125457550519668673598026254799948352,
+            1704003304756807228231582586456883401866958799709829924003555168741547960176
         ]
     ];
-    uint256[2] validProofC_incorrect = [
-        3718774677296111965628987936986701738438916711731522663485615268638604855259,
-        15664470303899517099778638779831003600948012776255763324223926677414563225933
+    uint256[2] validProofCIncorrect = [
+        1862820214253159801867008017419693231512243420476638764645735501747594412631,
+        1860067633072027579981620760559231595581410729592525645286971708351044373375
     ];
 
     bytes32 constant COMMITMENT_42_123 = 0x1d869fb8246b6131377493aaaf1cc16a8284d4aedcb7277079df35d0d1d552d1;
 
-    constructor(GuessGame _game, Groth16Verifier _verifier) {
+    constructor(GuessGame _game, Groth16Verifier _verifier, address _treasury) {
         game = _game;
         verifier = _verifier;
+        treasury = _treasury;
 
         // Initialize actors
         for (uint256 i = 0; i < 3; i++) {
@@ -122,30 +130,39 @@ contract GuessGameHandler is Test {
         boundStake(stakeRequired)
         useActor(creators, creatorSeed)
     {
-        // Fund the creator
-        vm.deal(creators[creatorSeed % creators.length], bountyAmount);
+        // Calculate total amount (bounty + collateral, 1:1)
+        uint256 totalAmount = bountyAmount * 2;
 
-        try game.createPuzzle{value: bountyAmount}(COMMITMENT_42_123, stakeRequired) returns (uint256 puzzleId) {
-            // Update ghost variables
+        // Fund the creator
+        vm.deal(creators[creatorSeed % creators.length], totalAmount);
+
+        try game.createPuzzle{value: totalAmount}(COMMITMENT_42_123, stakeRequired) returns (uint256 puzzleId) {
+            // Update ghost variables (bounty is half of total)
             ghostPuzzleExists[puzzleId] = true;
             ghostPuzzleBounty[puzzleId] = bountyAmount;
-            ghostTotalContractFunds += bountyAmount;
+            ghostPuzzleCollateral[puzzleId] = bountyAmount;
+            ghostPuzzleCreator[puzzleId] = creators[creatorSeed % creators.length];
+            ghostTotalContractFunds += totalAmount;
         } catch {
             // Ignore reverts
         }
     }
 
-    function submitGuess(uint256 puzzleId, uint256 guess, uint256 stakeAmount, uint256 guesserSeed)
+    function submitGuess(uint256 puzzleId, uint256, uint256 stakeAmount, uint256 guesserSeed)
         public
         boundStake(stakeAmount)
         useActor(guessers, guesserSeed)
     {
         if (!_isPuzzleActive(puzzleId)) return;
 
+        // Use unique guess number to avoid GuessAlreadySubmitted error
+        uint256 uniqueGuess = nextGuessNumber[puzzleId];
+        nextGuessNumber[puzzleId]++;
+
         // Fund the guesser
         vm.deal(guessers[guesserSeed % guessers.length], stakeAmount);
 
-        try game.submitGuess{value: stakeAmount}(puzzleId, guess) returns (uint256) {
+        try game.submitGuess{value: stakeAmount}(puzzleId, uniqueGuess) returns (uint256) {
             // Update ghost variables
             ghostPuzzlePendingStakes[puzzleId] += stakeAmount;
             ghostTotalContractFunds += stakeAmount;
@@ -169,9 +186,9 @@ contract GuessGameHandler is Test {
             try game.respondToChallenge(
                 puzzleId,
                 challengeId,
-                isCorrect ? validProofA_correct : validProofA_incorrect,
-                isCorrect ? validProofB_correct : validProofB_incorrect,
-                isCorrect ? validProofC_correct : validProofC_incorrect,
+                isCorrect ? validProofACorrect : validProofAIncorrect,
+                isCorrect ? validProofBCorrect : validProofBIncorrect,
+                isCorrect ? validProofCCorrect : validProofCIncorrect,
                 pubSignals
             ) {
                 // Stake is always returned to guesser
@@ -179,9 +196,11 @@ contract GuessGameHandler is Test {
                 ghostTotalContractFunds -= challenge.stake;
 
                 if (isCorrect) {
-                    // Puzzle solved - bounty also distributed
+                    // Puzzle solved - bounty goes to winner, collateral goes to creator's internal balance
                     ghostPuzzleSolved[puzzleId] = true;
                     ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId];
+                    // Collateral stays in contract (credited to creator's internal balance)
+                    // so we don't subtract it from ghostTotalContractFunds
                     ghostPuzzleBounty[puzzleId] = 0;
                 }
             } catch {
@@ -209,10 +228,11 @@ contract GuessGameHandler is Test {
             if (puzzle.pendingChallenges > 0) return;
 
             try game.cancelPuzzle(puzzleId) {
-                // Update ghost variables
+                // Update ghost variables (bounty + collateral returned to creator)
                 ghostPuzzleCancelled[puzzleId] = true;
-                ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId];
+                ghostTotalContractFunds -= ghostPuzzleBounty[puzzleId] + ghostPuzzleCollateral[puzzleId];
                 ghostPuzzleBounty[puzzleId] = 0;
+                ghostPuzzleCollateral[puzzleId] = 0;
             } catch {
                 // Ignore reverts (including CancelTooSoon)
             }
@@ -233,7 +253,12 @@ contract GuessGameHandler is Test {
         try game.forfeitPuzzle(puzzleId, challengeId) {
             // Update ghost variables
             ghostPuzzleForfeited[puzzleId] = true;
-            // Note: bounty and stakes will be distributed via claims, so we don't update funds here yet
+            // Collateral is slashed to treasury
+            uint256 collateral = ghostPuzzleCollateral[puzzleId];
+            ghostTreasuryReceived += collateral;
+            ghostTotalContractFunds -= collateral;
+            ghostPuzzleCollateral[puzzleId] = 0;
+            // Note: bounty and stakes will be distributed via claims
         } catch {
             // Ignore reverts
         }
@@ -272,12 +297,13 @@ contract GuessGameHandler is Test {
         uint256 puzzleCount = game.puzzleCount();
         for (uint256 i = 0; i < puzzleCount; i++) {
             if (_isPuzzleActive(i)) {
-                total += ghostPuzzleBounty[i] + ghostPuzzlePendingStakes[i];
+                // Include bounty + collateral + pending stakes
+                total += ghostPuzzleBounty[i] + ghostPuzzleCollateral[i] + ghostPuzzlePendingStakes[i];
             } else if (ghostPuzzleForfeited[i]) {
-                // For forfeited puzzles, include unclaimed funds
+                // For forfeited puzzles, include unclaimed funds (collateral goes to treasury)
                 IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
                 if (puzzle.pendingChallenges > 0) {
-                    // Still has pending claims
+                    // Still has pending claims (bounty + stakes, collateral already sent to treasury)
                     total += ghostPuzzleBounty[i] + ghostPuzzlePendingStakes[i];
                 }
             }
