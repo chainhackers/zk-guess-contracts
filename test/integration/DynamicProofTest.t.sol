@@ -244,18 +244,19 @@ contract DynamicProofTest is Test, ProofGenerator {
     }
 
     /**
-     * @notice Test with random large numbers in 16-bit range
-     * @dev Uses vm.randomUint to generate truly random values at test time
+     * @notice Fuzz test with random large numbers in 16-bit range
+     * @dev Uses fuzz parameters to test with different random values each CI run
      */
-    function test_DynamicProof_RandomLargeNumbers() public {
-        // Generate random values in 16-bit range (1-65535)
-        uint256 secret = (vm.randomUint() % 65535) + 1;
-        uint256 salt = vm.randomUint();
-        uint256 wrongGuess = (vm.randomUint() % 65535) + 1;
+    function testFuzz_DynamicProof_RandomLargeNumbers(uint256 secretSeed, uint256 saltSeed, uint256 guessSeed) public {
+        // Bound values to 16-bit range (1-65535)
+        uint256 secret = bound(secretSeed, 1, 65535);
+        uint256 salt = saltSeed;
+        uint256 wrongGuess = bound(guessSeed, 1, 65535);
 
         // Ensure wrong guess is different from secret
         if (wrongGuess == secret) {
-            wrongGuess = (wrongGuess % 65535) + 1;
+            wrongGuess = (wrongGuess % 65534) + 1;
+            if (wrongGuess >= secret) wrongGuess++;
         }
 
         // Generate commitment using FFI
