@@ -15,7 +15,7 @@ import "../utils/ProofGenerator.sol";
  * WARNING: These tests are SLOW (~90-120 seconds per test due to proof generation).
  *          They are excluded from normal test runs.
  *
- * Circuit constraints: secret must be 1-100 (enforced by GuessNumber circuit)
+ * Circuit constraints: secret must be 1-65535 (enforced by GuessNumber circuit)
  *
  * Run these tests separately:
  *   forge test --match-path "test/integration/*" -vvv --ffi
@@ -134,13 +134,13 @@ contract DynamicProofTest is Test, ProofGenerator {
     /**
      * @notice Test with non-hardcoded values
      * @dev Uses different values than hardcoded tests to ensure circuit works generally
-     * @dev Circuit constrains: secret must be 1-100 (8-bit range)
+     * @dev Circuit constrains: secret must be 1-65535 (16-bit range)
      */
     function test_DynamicProof_DifferentValues() public {
-        // Use non-trivial values within circuit constraints (secret: 1-100)
+        // Use non-trivial values within circuit constraints (secret: 1-65535)
         uint256 secret = 73;
         uint256 salt = 456;
-        uint256 wrongGuess = (secret % 100) + 1; // guaranteed to be different (74)
+        uint256 wrongGuess = (secret % 65535) + 1; // guaranteed to be different (74)
 
         // Generate commitment using FFI
         bytes32 commitment = computeCommitment(secret, salt);
@@ -188,7 +188,7 @@ contract DynamicProofTest is Test, ProofGenerator {
     /**
      * @notice Complete flow: multiple guesses with dynamic proofs
      * @dev Tests multiple guessers, wrong guesses, then correct guess wins
-     * @dev Circuit constrains: secret must be 1-100
+     * @dev Circuit constrains: secret must be 1-65535
      */
     function test_DynamicProof_MultipleGuessers() public {
         uint256 secret = 77;
@@ -244,9 +244,63 @@ contract DynamicProofTest is Test, ProofGenerator {
     }
 
     /**
+     * @notice Test with random large numbers in 16-bit range
+     * @dev Uses vm.randomUint to generate truly random values at test time
+     */
+    function test_DynamicProof_RandomLargeNumbers() public {
+        // Generate random values in 16-bit range (1-65535)
+        uint256 secret = (vm.randomUint() % 65535) + 1;
+        uint256 salt = vm.randomUint();
+        uint256 wrongGuess = (vm.randomUint() % 65535) + 1;
+
+        // Ensure wrong guess is different from secret
+        if (wrongGuess == secret) {
+            wrongGuess = (wrongGuess % 65535) + 1;
+        }
+
+        // Generate commitment using FFI
+        bytes32 commitment = computeCommitment(secret, salt);
+
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether);
+
+        // Submit wrong guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, wrongGuess);
+
+        // Generate proof for wrong guess
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[3] memory pubSignals) =
+            generateProof(secret, salt, wrongGuess);
+
+        assertEq(pubSignals[1], 0, "isCorrect should be 0");
+
+        // Respond with proof
+        vm.prank(creator);
+        game.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);
+
+        assertFalse(game.getPuzzle(puzzleId).solved, "Puzzle should not be solved");
+
+        // Submit correct guess
+        vm.prank(guesser);
+        uint256 correctChallengeId = game.submitGuess{value: 0.01 ether}(puzzleId, secret);
+
+        // Generate proof for correct guess
+        (pA, pB, pC, pubSignals) = generateProof(secret, salt, secret);
+
+        assertEq(pubSignals[1], 1, "isCorrect should be 1");
+
+        // Respond with correct proof
+        vm.prank(creator);
+        game.respondToChallenge(puzzleId, correctChallengeId, pA, pB, pC, pubSignals);
+
+        assertTrue(game.getPuzzle(puzzleId).solved, "Puzzle should be solved");
+    }
+
+    /**
      * @notice Verify commitment matches between FFI and contract
      * @dev Sanity check that the commitment from FFI matches what the contract stores
-     * @dev Circuit constrains: secret must be 1-100
+     * @dev Circuit constrains: secret must be 1-65535
      */
     function test_DynamicProof_CommitmentIntegrity() public {
         uint256 secret = 55;
