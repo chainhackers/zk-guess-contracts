@@ -11,18 +11,18 @@ template GuessNumber() {
     signal output commitment;
     signal output isCorrect;
     
-    // Range constraints: ensure number is between 1 and 100
+    // Range constraints: ensure number is between 1 and 65535
     // Check number >= 1
-    component geq1 = GreaterEqThan(8); // 8 bits is enough for numbers up to 255
+    component geq1 = GreaterEqThan(16); // 16 bits for numbers up to 65535
     geq1.in[0] <== number;
     geq1.in[1] <== 1;
     geq1.out === 1;
-    
-    // Check number <= 100
-    component leq100 = LessEqThan(8);
-    leq100.in[0] <== number;
-    leq100.in[1] <== 100;
-    leq100.out === 1;
+
+    // Check number <= 65535
+    component leq65535 = LessEqThan(16);
+    leq65535.in[0] <== number;
+    leq65535.in[1] <== 65535;
+    leq65535.out === 1;
     
     // Generate commitment using Poseidon hash
     component hasher = Poseidon(2);

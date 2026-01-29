@@ -18,77 +18,77 @@ contract GuessGameWithProofsTest is Test {
     bytes32 constant COMMITMENT_42_123 = 0x1d869fb8246b6131377493aaaf1cc16a8284d4aedcb7277079df35d0d1d552d1;
 
     // Valid proof for correct guess (42)
-    uint256[2] validProofA_correct = [
-        15542852638303206696340444990953492914432696738794772502775610647150973235963,
-        10596189707092087383812218599788573967428124580989879019940613000440671756601
+    uint256[2] validProofACorrect = [
+        11504940021775654723396425733285520171636083270569085996696638875572788294702,
+        20637774454469044945452272765979331202451395558074875764295247503932702604629
     ];
-    uint256[2][2] validProofB_correct = [
+    uint256[2][2] validProofBCorrect = [
         [
-            21698874211651785497892418626128483595169844392940900354187037404243541307937,
-            2071838037415292914056747627575344429302785915400287351797640428017637388260
+            19724327737928428067436744771566894225255546895126133643853596733661323080944,
+            13492609421459766523740584888043360210859595830002357517875974051598571449631
         ],
         [
-            15200050834221357809199697256261426654786821375164346838713074080050458117042,
-            5750404480137788989853504342835086846851890827252459067644459461979772870283
+            9101346022506809922940675743405360969490706785433757256514522858631885651223,
+            12264233282322348000730820238906876741351433565392606730751196784147109643754
         ]
     ];
-    uint256[2] validProofC_correct = [
-        18117202686279497538698385554631394911345302327424671006356890854772268143615,
-        3542424356735774995870657642911868303790744429980280472760451469858952139390
+    uint256[2] validProofCCorrect = [
+        17615922777476637143563646924700485140840791473300702105604187277711362783877,
+        3483001149425582467351102259969255865622028834738135840359710692864323177598
     ];
-    uint256[3] validPubSignals_correct = [
+    uint256[3] validPubSignalsCorrect = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         1, // isCorrect = true
-        42 //guess
+        42 // guess
     ];
 
     // Valid proof for incorrect guess (50)
-    uint256[2] validProofA_incorrect = [
-        3364672360492296507034511930302267018941894416535030435002742763862273853807,
-        10511255209593992143172534123880342191894873685592843814310184259000257709856
+    uint256[2] validProofAIncorrect = [
+        17668304494923110155110008244216636870940265447331590922567454459053815694304,
+        13683766786964868367848848655586138024784872326513979640650673946629532736401
     ];
-    uint256[2][2] validProofB_incorrect = [
+    uint256[2][2] validProofBIncorrect = [
         [
-            3526685943163558454366018228687147473376158293403445437898317517903797116104,
-            11964113483940569365060893273411920407938187050379733431404144880231651790024
+            1945857558955814391241731181179539082141059668772203558278829707457186200701,
+            12053699461649061725393751797387552055526376190469242430549646015289936822082
         ],
         [
-            15234279533641182618208416848613436479969910481895873895662974781727346179748,
-            16454688506885755244690896043981865850542161515309650429707773686412990768888
+            20996945187651455596783162227378312257353125457550519668673598026254799948352,
+            1704003304756807228231582586456883401866958799709829924003555168741547960176
         ]
     ];
-    uint256[2] validProofC_incorrect = [
-        3293058257413774448062971737532668348012548306946092786115196414980556574053,
-        15586935452123439844029511993836791229082913365766756898632685724149643980999
+    uint256[2] validProofCIncorrect = [
+        1862820214253159801867008017419693231512243420476638764645735501747594412631,
+        1860067633072027579981620760559231595581410729592525645286971708351044373375
     ];
-    uint256[3] validPubSignals_incorrect = [
+    uint256[3] validPubSignalsIncorrect = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         0, // isCorrect = false
-        50 //guess
+        50 // guess
     ];
 
-    uint256[2] validProofA_incorrect_99 = [
-        21193181490179146787761764451117362660776537725905963669706593824330403445166,
-        18227957644163596658005395111700177720548358379064814128241930364464680311333
+    uint256[2] validProofAIncorrect99 = [
+        804467478234591078564296146768727120047083316329205896545305259413950070894,
+        7081835310857666942347030190561921688081932119348854178110757745348621526159
     ];
-    uint256[2][2] validProofB_incorrect_99 = [
+    uint256[2][2] validProofBIncorrect99 = [
         [
-            8616313621189408999920857619066112210813879397235962598471911573990105998331,
-            3288252158497775640309059138619062962495646623717813151350778118606462157863
+            17504033256295542988230800600253542314573520413706945646111607973617172534654,
+            19892959214604392020975527419916984129925846083627501251243274169257121276138
         ],
         [
-            16000286551758209054638096744469934314508038398337230835207999216917324608159,
-            21823003656285762255890684759620488913491369265171454566456522205702539611318
+            11557317381888544497723887060095535002545587078148365231121728712300595766894,
+            12858679097921581359694035391015104890336106380482676799728140974939689601831
         ]
     ];
-    uint256[2] validProofC_incorrect_99 = [
-        20880159928469537476530195327323522044678382675305322326647544044011754702331,
-        17652815965561823569551523347411061330335660456588250089192377857546392344587
+    uint256[2] validProofCIncorrect99 = [
+        15590127710147924636023786092996100386087173289096289457260393776562306587259,
+        11185759149821520578468310786473461020210615127490067668765677236421267035160
     ];
-    uint256[3] validPubSignals_incorrect_99 = [
+    uint256[3] validPubSignalsIncorrect99 = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         0, // isCorrect = false
-        99 //guess
+        99 // guess
     ];
 
     address treasury;
@@ -129,12 +129,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with valid proof showing guess is correct
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Verify puzzle is solved
@@ -167,10 +162,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Verify puzzle is NOT solved
@@ -198,10 +193,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Guesser should have stake back
@@ -218,10 +213,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         // Guesser2 should have stake back
@@ -239,12 +234,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with correct proof
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId3,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId3, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Verify puzzle is solved
@@ -274,10 +264,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         // Then respond to challenge 1 with proof for guess 50
@@ -285,10 +275,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Both challenges responded
@@ -316,7 +306,7 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProof.selector);
         game.respondToChallenge(
-            puzzleId, challengeId, validProofA_correct, validProofB_correct, validProofC_correct, wrongPubSignals
+            puzzleId, challengeId, validProofACorrect, validProofBCorrect, validProofCCorrect, wrongPubSignals
         );
     }
 
@@ -336,12 +326,7 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InvalidProofForChallengeGuess.selector);
         game.respondToChallenge(
-            puzzleId,
-            challengeId,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Try to respond to challenge for guess 42 with proof for guess 99 - should fail
@@ -350,10 +335,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
     }
 
@@ -370,10 +355,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Try to respond again
@@ -382,10 +367,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
     }
 
@@ -405,12 +390,7 @@ contract GuessGameWithProofsTest is Test {
         // Solve puzzle with first guess
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId1,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Try to respond to second guess after puzzle is solved
@@ -419,10 +399,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
     }
 
@@ -445,10 +425,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Can't cancel yet - timeout hasn't passed
@@ -493,10 +473,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
     }
 
@@ -517,10 +497,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Warp time
@@ -560,10 +540,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Warp time past timeout
@@ -656,10 +636,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1, // challenge for guess 50
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99 // proof for guess 99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99 // proof for guess 99
         );
 
         // Try to respond to challenge for guess 99 with proof for guess 50
@@ -668,10 +648,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2, // challenge for guess 99
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect // proof for guess 50
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect // proof for guess 50
         );
 
         // Try to respond to wrong guess with correct proof (proof says correct but guess wasn't 42)
@@ -680,10 +660,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1, // challenge for guess 50
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct // proof for guess 42 (correct answer)
+            validProofACorrect,
+            validProofBCorrect,
+            validProofCCorrect,
+            validPubSignalsCorrect // proof for guess 42 (correct answer)
         );
 
         // Challenges should still be pending
@@ -696,10 +676,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         // Guesser 1 should have stake back
@@ -710,10 +690,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         // Guesser 2 should have stake back
@@ -742,12 +722,7 @@ contract GuessGameWithProofsTest is Test {
         // ========== Step 6: Creator responds, guesser wins bounty + stake ==========
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId3,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId3, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Verify final state
@@ -805,10 +780,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId2,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         puzzle = game.getPuzzle(puzzleId);
@@ -821,10 +796,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             challengeId1,
-            validProofA_incorrect,
-            validProofB_incorrect,
-            validProofC_incorrect,
-            validPubSignals_incorrect
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
         );
 
         puzzle = game.getPuzzle(puzzleId);
@@ -947,12 +922,7 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to guesser 1 (correct) - puzzle is solved
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId1,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Guesser 1 wins bounty + stake
@@ -1231,14 +1201,14 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to guesser's wrong guess
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId2, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
+            puzzleId2, 0, validProofAIncorrect, validProofBIncorrect, validProofCIncorrect, validPubSignalsIncorrect
         );
         // guesser gets 0.02 stake back immediately
 
         // Creator responds to guesser2's correct guess - puzzle solved
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId2, 1, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId2, 1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
         // guesser2 gets 0.02 stake + 0.2 bounty immediately
 
@@ -1300,7 +1270,7 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to guesser3's correct guess first - puzzle solved
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 2, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId, 2, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // guesser3 wins bounty + stake immediately
@@ -1361,7 +1331,7 @@ contract GuessGameWithProofsTest is Test {
         vm.warp(block.timestamp - game.RESPONSE_TIMEOUT());
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId2, 1, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId2, 1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // guesser claims stake from solved puzzle
@@ -1440,7 +1410,7 @@ contract GuessGameWithProofsTest is Test {
 
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 3, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId, 3, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Guesser claims all 3 stakes in one call
@@ -1467,7 +1437,7 @@ contract GuessGameWithProofsTest is Test {
 
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 0, validProofA_correct, validProofB_correct, validProofC_correct, validPubSignals_correct
+            puzzleId, 0, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Winner's aggregates are decremented to 0
@@ -1501,7 +1471,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond to first challenge
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
+            puzzleId, 0, validProofAIncorrect, validProofBIncorrect, validProofCIncorrect, validPubSignalsIncorrect
         );
 
         // Aggregates decremented
@@ -1513,10 +1483,10 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId,
             1,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         // Aggregates now zero
@@ -1677,12 +1647,7 @@ contract GuessGameWithProofsTest is Test {
         // Respond with correct proof
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId,
-            challengeId,
-            validProofA_correct,
-            validProofB_correct,
-            validProofC_correct,
-            validPubSignals_correct
+            puzzleId, challengeId, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
 
         // Creator's collateral should be credited to internal balance
@@ -1739,7 +1704,7 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to challenge 0 only
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
+            puzzleId, 0, validProofAIncorrect, validProofBIncorrect, validProofCIncorrect, validPubSignalsIncorrect
         );
 
         // Warp and forfeit using challenge 1
@@ -1770,17 +1735,17 @@ contract GuessGameWithProofsTest is Test {
         // Creator responds to both
         vm.prank(creator);
         game.respondToChallenge(
-            puzzleId, 0, validProofA_incorrect, validProofB_incorrect, validProofC_incorrect, validPubSignals_incorrect
+            puzzleId, 0, validProofAIncorrect, validProofBIncorrect, validProofCIncorrect, validPubSignalsIncorrect
         );
 
         vm.prank(creator);
         game.respondToChallenge(
             puzzleId,
             1,
-            validProofA_incorrect_99,
-            validProofB_incorrect_99,
-            validProofC_incorrect_99,
-            validPubSignals_incorrect_99
+            validProofAIncorrect99,
+            validProofBIncorrect99,
+            validProofCIncorrect99,
+            validPubSignalsIncorrect99
         );
 
         // Warp past cancel timeout and cancel
