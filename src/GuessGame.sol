@@ -81,11 +81,7 @@ contract GuessGame is IGuessGame {
         guesserChallengeCount[puzzleId][msg.sender]++;
 
         puzzleChallenges[puzzleId][challengeId] = Challenge({
-            guesser: msg.sender,
-            responded: false,
-            guess: guess,
-            stake: msg.value,
-            timestamp: block.timestamp
+            guesser: msg.sender, responded: false, guess: guess, stake: msg.value, timestamp: block.timestamp
         });
 
         emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
