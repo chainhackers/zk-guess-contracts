@@ -9,6 +9,7 @@ interface IGuessGame {
         bool forfeited;
         bytes32 commitment;
         uint256 bounty;
+        uint256 collateral;
         uint256 stakeRequired;
         uint256 challengeCount;
         uint256 pendingChallenges;
@@ -31,6 +32,7 @@ interface IGuessGame {
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
     event PuzzleCancelled(uint256 indexed puzzleId);
     event PuzzleForfeited(uint256 indexed puzzleId);
+    event CollateralSlashed(uint256 indexed puzzleId, uint256 amount);
     event ForfeitClaimed(uint256 indexed puzzleId, address guesser, uint256 amount);
     event StakeClaimedFromSolved(uint256 indexed puzzleId, address guesser, uint256 stake);
     event Withdrawal(address indexed account, uint256 amount);
@@ -59,6 +61,7 @@ interface IGuessGame {
     error CreatorCannotGuess();
     error AlreadyClaimed();
     error NothingToWithdraw();
+    error GuessAlreadySubmitted();
 
     // Functions
     function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId);

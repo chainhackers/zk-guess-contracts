@@ -6,10 +6,12 @@ import "./interfaces/IGuessGame.sol";
 
 contract GuessGame is IGuessGame {
     IGroth16Verifier public immutable verifier;
+    address public immutable treasury;
     uint256 public puzzleCount;
 
     mapping(uint256 => Puzzle) public puzzles;
     mapping(uint256 => mapping(uint256 => Challenge)) public puzzleChallenges;
+    mapping(uint256 => mapping(uint256 => bool)) public guessSubmitted;
 
     // Per-guesser aggregates per puzzle
     mapping(uint256 => mapping(address => uint256)) public guesserStakeTotal;
@@ -24,14 +26,20 @@ contract GuessGame is IGuessGame {
     uint256 public constant CANCEL_TIMEOUT = 1 days;
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
-    constructor(address _verifier) {
+    constructor(address _verifier, address _treasury) {
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
+        treasury = _treasury;
     }
 
     function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId) {
-        if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
+        // msg.value must be at least 2x MIN_BOUNTY (bounty + collateral)
+        if (msg.value < MIN_BOUNTY * 2) revert InsufficientBounty();
         if (stakeRequired < MIN_STAKE) revert InsufficientStake();
+
+        // Floor division: extra wei goes to bounty
+        uint256 collateral = msg.value / 2;
+        uint256 bounty = msg.value - collateral;
 
         puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
@@ -40,7 +48,8 @@ contract GuessGame is IGuessGame {
             cancelled: false,
             forfeited: false,
             commitment: commitment,
-            bounty: msg.value,
+            bounty: bounty,
+            collateral: collateral,
             stakeRequired: stakeRequired,
             challengeCount: 0,
             pendingChallenges: 0,
@@ -48,7 +57,7 @@ contract GuessGame is IGuessGame {
             pendingAtForfeit: 0
         });
 
-        emit PuzzleCreated(puzzleId, msg.sender, commitment, msg.value);
+        emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty);
     }
 
     function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId) {
@@ -59,6 +68,9 @@ contract GuessGame is IGuessGame {
         if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (msg.sender == puzzle.creator) revert CreatorCannotGuess();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
+        if (guessSubmitted[puzzleId][guess]) revert GuessAlreadySubmitted();
+
+        guessSubmitted[puzzleId][guess] = true;
 
         challengeId = puzzle.challengeCount++;
         puzzle.pendingChallenges++;
@@ -122,6 +134,9 @@ contract GuessGame is IGuessGame {
             uint256 totalPrize = puzzle.bounty + challenge.stake;
             emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
 
+            // Return collateral to creator
+            balances[puzzle.creator] += puzzle.collateral;
+
             (bool success,) = challenge.guesser.call{value: totalPrize}("");
             if (!success) revert TransferFailed();
         } else {
@@ -148,8 +163,8 @@ contract GuessGame is IGuessGame {
 
         emit PuzzleCancelled(puzzleId);
 
-        // Return bounty to creator
-        (bool success,) = puzzle.creator.call{value: puzzle.bounty}("");
+        // Return bounty + collateral to creator
+        (bool success,) = puzzle.creator.call{value: puzzle.bounty + puzzle.collateral}("");
         if (!success) revert TransferFailed();
     }
 
@@ -171,6 +186,13 @@ contract GuessGame is IGuessGame {
         puzzle.pendingAtForfeit = puzzle.pendingChallenges;
 
         emit PuzzleForfeited(puzzleId);
+
+        // Slash collateral to treasury
+        if (puzzle.collateral > 0) {
+            emit CollateralSlashed(puzzleId, puzzle.collateral);
+            (bool success,) = treasury.call{value: puzzle.collateral}("");
+            if (!success) revert TransferFailed();
+        }
     }
 
     function claimFromForfeited(uint256 puzzleId) external {

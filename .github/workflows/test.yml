@@ -22,6 +22,17 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Show Forge version
         run: |
@@ -39,15 +50,40 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          forge test -vvv --no-match-path "test/integration/*"
         id: test
 
       - name: Generate gas snapshots
         run: |
-          forge snapshot
+          forge snapshot --no-match-path "test/integration/*"
         id: snapshot
 
       - name: Run coverage
         run: |
-          forge coverage --report summary
+          forge coverage --report summary --no-match-path "test/integration/*"
         id: coverage
+
+  integration-tests:
+    name: Integration tests (FFI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Run FFI integration tests
+        run: forge test --match-path "test/integration/*" -vvv --ffi
