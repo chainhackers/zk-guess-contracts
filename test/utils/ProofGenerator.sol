@@ -17,19 +17,38 @@ abstract contract ProofGenerator is Test {
      * @return pA First part of proof
      * @return pB Second part of proof (2x2 matrix)
      * @return pC Third part of proof
-     * @return pubSignals Public signals: [commitment, isCorrect, guess]
+     * @return pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
      */
     function generateProof(uint256 secret, uint256 salt, uint256 guess)
         internal
-        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[3] memory pubSignals)
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals)
+    {
+        return generateProofWithMaxNumber(secret, salt, guess, 65535);
+    }
+
+    /**
+     * @notice Generate a ZK proof using FFI with custom maxNumber
+     * @param secret The secret number
+     * @param salt The salt used in commitment
+     * @param guess The guess being verified
+     * @param maxNumber The maximum number for the puzzle
+     * @return pA First part of proof
+     * @return pB Second part of proof (2x2 matrix)
+     * @return pC Third part of proof
+     * @return pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
+     */
+    function generateProofWithMaxNumber(uint256 secret, uint256 salt, uint256 guess, uint256 maxNumber)
+        internal
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals)
     {
         // Build FFI command
-        string[] memory inputs = new string[](5);
+        string[] memory inputs = new string[](6);
         inputs[0] = "node";
         inputs[1] = "scripts/generate-proof.js";
         inputs[2] = vm.toString(secret);
         inputs[3] = vm.toString(salt);
         inputs[4] = vm.toString(guess);
+        inputs[5] = vm.toString(maxNumber);
 
         // Execute FFI call
         bytes memory result = vm.ffi(inputs);
@@ -55,6 +74,7 @@ abstract contract ProofGenerator is Test {
         pubSignals[0] = vm.parseJsonUint(json, ".pubSignals[0]");
         pubSignals[1] = vm.parseJsonUint(json, ".pubSignals[1]");
         pubSignals[2] = vm.parseJsonUint(json, ".pubSignals[2]");
+        pubSignals[3] = vm.parseJsonUint(json, ".pubSignals[3]");
     }
 
     /**
@@ -66,7 +86,7 @@ abstract contract ProofGenerator is Test {
      */
     function computeCommitment(uint256 secret, uint256 salt) internal returns (bytes32 commitment) {
         // Generate proof just to get the commitment from pubSignals
-        (,,, uint256[3] memory pubSignals) = generateProof(secret, salt, 0);
+        (,,, uint256[4] memory pubSignals) = generateProof(secret, salt, 0);
         return bytes32(pubSignals[0]);
     }
 }

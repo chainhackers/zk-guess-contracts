@@ -11,6 +11,7 @@ interface IGuessGame {
         uint256 bounty;
         uint256 collateral;
         uint256 stakeRequired;
+        uint256 maxNumber; // Creator-defined max for guesses (1-65535)
         uint256 challengeCount;
         uint256 pendingChallenges;
         uint256 lastChallengeTimestamp;
@@ -26,7 +27,9 @@ interface IGuessGame {
     }
 
     // Events
-    event PuzzleCreated(uint256 indexed puzzleId, address creator, bytes32 commitment, uint256 bounty);
+    event PuzzleCreated(
+        uint256 indexed puzzleId, address creator, bytes32 commitment, uint256 bounty, uint256 maxNumber
+    );
     event ChallengeCreated(uint256 indexed challengeId, uint256 indexed puzzleId, address guesser, uint256 guess);
     event ChallengeResponded(uint256 indexed challengeId, bool correct);
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
@@ -62,9 +65,13 @@ interface IGuessGame {
     error AlreadyClaimed();
     error NothingToWithdraw();
     error GuessAlreadySubmitted();
+    error InvalidMaxNumber();
 
     // Functions
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId);
+    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
+        external
+        payable
+        returns (uint256 puzzleId);
 
     function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId);
 
@@ -73,7 +80,7 @@ interface IGuessGame {
      * @param puzzleId The puzzle the challenge belongs to
      * @param challengeId The challenge to respond to
      * @param _pA, _pB, _pC The proof components
-     * @param _pubSignals Public signals: [commitment, isCorrect]
+     * @param _pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
      *                    where isCorrect = 1 if guess matches secret, 0 otherwise
      * @dev The creator proves they know the secret (never revealed) and whether the guess is correct
      *      Guesser always gets their stake back
@@ -86,7 +93,7 @@ interface IGuessGame {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[3] calldata _pubSignals
+        uint256[4] calldata _pubSignals
     ) external;
 
     /**

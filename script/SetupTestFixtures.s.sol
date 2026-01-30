@@ -44,42 +44,42 @@ contract SetupTestFixtures is Script {
         // Puzzle 0: Easy starter (secret=42)
         vm.startBroadcast(ACCOUNT_0);
         bytes32 commitment1 = keccak256(abi.encodePacked(uint256(42)));
-        uint256 puzzle0 = guessGame.createPuzzle{value: 0.01 ether}(commitment1, 0.001 ether);
+        uint256 puzzle0 = guessGame.createPuzzle{value: 0.01 ether}(commitment1, 0.001 ether, 100);
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: Easy starter (secret=42, bounty=0.01 ETH)", puzzle0);
 
         // Puzzle 1: High roller (secret=77)
         vm.startBroadcast(ACCOUNT_1);
         bytes32 commitment2 = keccak256(abi.encodePacked(uint256(77)));
-        uint256 puzzle1 = guessGame.createPuzzle{value: 0.1 ether}(commitment2, 0.01 ether);
+        uint256 puzzle1 = guessGame.createPuzzle{value: 0.1 ether}(commitment2, 0.01 ether, 100);
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: High roller (secret=77, bounty=0.1 ETH)", puzzle1);
 
         // Puzzle 2: Lucky number (secret=13)
         vm.startBroadcast(ACCOUNT_2);
         bytes32 commitment3 = keccak256(abi.encodePacked(uint256(13)));
-        uint256 puzzle2 = guessGame.createPuzzle{value: 0.05 ether}(commitment3, 0.005 ether);
+        uint256 puzzle2 = guessGame.createPuzzle{value: 0.05 ether}(commitment3, 0.005 ether, 100);
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: Lucky number (secret=13, bounty=0.05 ETH)", puzzle2);
 
         // Puzzle 3: Free play (secret=88, no stake)
         vm.startBroadcast(ACCOUNT_3);
         bytes32 commitment4 = keccak256(abi.encodePacked(uint256(88)));
-        uint256 puzzle3 = guessGame.createPuzzle{value: 0.01 ether}(commitment4, 0); // 0 stake = free
+        uint256 puzzle3 = guessGame.createPuzzle{value: 0.01 ether}(commitment4, 0, 100); // 0 stake = free
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: Free play (secret=88, bounty=0.01 ETH, free)", puzzle3);
 
         // Puzzle 4: Big bounty (secret=99)
         vm.startBroadcast(ACCOUNT_4);
         bytes32 commitment5 = keccak256(abi.encodePacked(uint256(99)));
-        uint256 puzzle4 = guessGame.createPuzzle{value: 0.2 ether}(commitment5, 0.02 ether);
+        uint256 puzzle4 = guessGame.createPuzzle{value: 0.2 ether}(commitment5, 0.02 ether, 100);
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: Big bounty (secret=99, bounty=0.2 ETH)", puzzle4);
 
         // Puzzle 5: Quick game (secret=7)
         vm.startBroadcast(ACCOUNT_0);
         bytes32 commitment6 = keccak256(abi.encodePacked(uint256(7)));
-        uint256 puzzle5 = guessGame.createPuzzle{value: 0.02 ether}(commitment6, 0.002 ether);
+        uint256 puzzle5 = guessGame.createPuzzle{value: 0.02 ether}(commitment6, 0.002 ether, 100);
         vm.stopBroadcast();
         console.log("Created Puzzle #%d: Quick game (secret=7, bounty=0.02 ETH)", puzzle5);
     }

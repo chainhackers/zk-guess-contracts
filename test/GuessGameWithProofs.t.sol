@@ -19,76 +19,185 @@ contract GuessGameWithProofsTest is Test {
 
     // Valid proof for correct guess (42)
     uint256[2] validProofACorrect = [
-        11504940021775654723396425733285520171636083270569085996696638875572788294702,
-        20637774454469044945452272765979331202451395558074875764295247503932702604629
+        449531149912136475770353363361707418564909687680427115646129927332134531208,
+        14407370880265595278678350402832836798818885365896905083843433929267668266626
     ];
     uint256[2][2] validProofBCorrect = [
         [
-            19724327737928428067436744771566894225255546895126133643853596733661323080944,
-            13492609421459766523740584888043360210859595830002357517875974051598571449631
+            17312921197632836956585949276008014848208220036975940402101347538989464726893,
+            14649255969675641484092917911181181213459734554739828453996711367430887656035
         ],
         [
-            9101346022506809922940675743405360969490706785433757256514522858631885651223,
-            12264233282322348000730820238906876741351433565392606730751196784147109643754
+            19731250186663773803803693244597055364914729377868353692576144118343135911407,
+            17184617509137607503905361228458251326217701668871035762567589018625184554749
         ]
     ];
     uint256[2] validProofCCorrect = [
-        17615922777476637143563646924700485140840791473300702105604187277711362783877,
-        3483001149425582467351102259969255865622028834738135840359710692864323177598
+        21835658683758097992725297997527117386568439008454908069273763801277098932784,
+        9971757975327911076401779803594069722995141305793117329654742372844894117060
     ];
-    uint256[3] validPubSignalsCorrect = [
+    uint256[4] validPubSignalsCorrect = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         1, // isCorrect = true
-        42 // guess
+        42, // guess
+        100 // maxNumber
     ];
 
     // Valid proof for incorrect guess (50)
     uint256[2] validProofAIncorrect = [
-        17668304494923110155110008244216636870940265447331590922567454459053815694304,
-        13683766786964868367848848655586138024784872326513979640650673946629532736401
+        10852066913978342118218498818335408844066258321902599194444720468359168576214,
+        6965698820638077395094099877008034652702640564558429698785929019854255895452
     ];
     uint256[2][2] validProofBIncorrect = [
         [
-            1945857558955814391241731181179539082141059668772203558278829707457186200701,
-            12053699461649061725393751797387552055526376190469242430549646015289936822082
+            1613230777238805011830229517807176666334104047967446217283376846766348057999,
+            4374229236798730817553670335020809672579377927876284581397418664965153211023
         ],
         [
-            20996945187651455596783162227378312257353125457550519668673598026254799948352,
-            1704003304756807228231582586456883401866958799709829924003555168741547960176
+            4520893247875616557226868523444705263309850113066582487089193591474052220970,
+            7766575812497568221119740140062493894108981945203859417355220016465955717634
         ]
     ];
     uint256[2] validProofCIncorrect = [
-        1862820214253159801867008017419693231512243420476638764645735501747594412631,
-        1860067633072027579981620760559231595581410729592525645286971708351044373375
+        4156351497089605839121606963169954792875252974032590314960492405100124400333,
+        6066764750676488417561440637467884321186918175528620457428676808171983539025
     ];
-    uint256[3] validPubSignalsIncorrect = [
+    uint256[4] validPubSignalsIncorrect = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         0, // isCorrect = false
-        50 // guess
+        50, // guess
+        100 // maxNumber
     ];
 
     uint256[2] validProofAIncorrect99 = [
-        804467478234591078564296146768727120047083316329205896545305259413950070894,
-        7081835310857666942347030190561921688081932119348854178110757745348621526159
+        20238257380398462109625305257681209587390634376397924434662156745750380175772,
+        20137222033729095677023640340890441018247927495941043856688125858305739190008
     ];
     uint256[2][2] validProofBIncorrect99 = [
         [
-            17504033256295542988230800600253542314573520413706945646111607973617172534654,
-            19892959214604392020975527419916984129925846083627501251243274169257121276138
+            18216358821465894938073906789193441816367439384630773527255415179172982080906,
+            5956667654854502273772496828776497077218738640205310299743644974908932105454
         ],
         [
-            11557317381888544497723887060095535002545587078148365231121728712300595766894,
-            12858679097921581359694035391015104890336106380482676799728140974939689601831
+            20554576871044193222203737715797360746377347990010674378385310048234949855070,
+            8854741162951976330308983361193467677555820844654082290325622067664808428365
         ]
     ];
     uint256[2] validProofCIncorrect99 = [
-        15590127710147924636023786092996100386087173289096289457260393776562306587259,
-        11185759149821520578468310786473461020210615127490067668765677236421267035160
+        19161772029134157736177401438648405879578080000870552814923080173708876110607,
+        16974494634316757488520087426789911676139205226757527939650041947089531989115
     ];
-    uint256[3] validPubSignalsIncorrect99 = [
+    uint256[4] validPubSignalsIncorrect99 = [
         uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
         0, // isCorrect = false
-        99 // guess
+        99, // guess
+        100 // maxNumber
+    ];
+
+    // ============ Proofs for maxNumber=1000 ============
+    // For number=42, salt=123, maxNumber=1000
+    uint256[2] validProofACorrect1000 = [
+        18847985216665142978081774218178107209768582294586703058667298716424013372379,
+        9366440468644165713379979381227061738553224267553713945998292420773558181670
+    ];
+    uint256[2][2] validProofBCorrect1000 = [
+        [
+            10072807236965322499995463031915907552715282387944599615263088762260416482150,
+            792989414040019749524888096303195844187226625410003610803561269819236391622
+        ],
+        [
+            11148670015275684213916526144672990030417517565958608124887074597305628580014,
+            8906201543348422535719486407485301863219203174530813902224940283417457319670
+        ]
+    ];
+    uint256[2] validProofCCorrect1000 = [
+        17721477278375672568665059292600073171948001096912167357572928597712931358903,
+        12564177556938113320554397360219532740458970332405378746397960050426970324194
+    ];
+    uint256[4] validPubSignalsCorrect1000 = [
+        uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
+        1, // isCorrect = true
+        42, // guess
+        1000 // maxNumber
+    ];
+
+    uint256[2] validProofAIncorrect1000 = [
+        2787075765217130779120796346272195950752009440013549006582882506079121480544,
+        4170882576874699946487474481507329871010855828850559551778176221303676763907
+    ];
+    uint256[2][2] validProofBIncorrect1000 = [
+        [
+            15637369754087166259453484668084469411240453088299161248309019314790818841577,
+            9051254283466963230254045996498904255899790530805492793480413077800312770568
+        ],
+        [
+            16456721088265572335604933803876079280499210966013879915250060954069840475151,
+            11935880564889506369974821915935531912849828930775306943116699440033869598251
+        ]
+    ];
+    uint256[2] validProofCIncorrect1000 = [
+        19451833340582089559324443608080995885856791775870146011846347807192349166803,
+        12670556175182414222220330734118591452010589161431528389062246032635357458678
+    ];
+    uint256[4] validPubSignalsIncorrect1000 = [
+        uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
+        0, // isCorrect = false
+        50, // guess
+        1000 // maxNumber
+    ];
+
+    // ============ Proofs for maxNumber=65535 (full 16-bit range) ============
+    // For number=50000, salt=999, maxNumber=65535
+    bytes32 constant COMMITMENT_50000_999 = 0x2cc18bc721abaa61b337c7223c0e0cfc2a80edfa8f5ba0a39b8c01285c78504a;
+
+    uint256[2] validProofACorrect65535 = [
+        10598737190753346751574744581419436545095237921406774980412613779518807527848,
+        6426529550030088879839628654264983608203547148595051753929428140487144388859
+    ];
+    uint256[2][2] validProofBCorrect65535 = [
+        [
+            3486639708413223218370050557604656066356042530302616042926175876252588232134,
+            1434939216509495009292800081090199847308768092825159112399066050848573139769
+        ],
+        [
+            4840481135868384718516775991348095134491587540684076483249190596779173265346,
+            10204110299085893118125113153704096388051065873532927683454255988921757351894
+        ]
+    ];
+    uint256[2] validProofCCorrect65535 = [
+        21291174315797348261043953694775560695185631114833029062499063660597799546789,
+        19696660917708073713109439871998029249355357778354827827198147489183306556770
+    ];
+    uint256[4] validPubSignalsCorrect65535 = [
+        uint256(20243731532483464653008282803235725156917772166930941746636225099857223241802),
+        1, // isCorrect = true
+        50000, // guess
+        65535 // maxNumber
+    ];
+
+    uint256[2] validProofAIncorrect65535 = [
+        4783117061383643717978727120617543697060671113850020198738562741012154887279,
+        17072574070951115007123801855231149624184649949369314930111493037180535066555
+    ];
+    uint256[2][2] validProofBIncorrect65535 = [
+        [
+            6593447033291639939399615175040692675367233183888056461502896136905606121062,
+            14396528473537351017523760101610528354507779308424497731228307514922984932404
+        ],
+        [
+            3978460844663001671471038227866805695716918410099357276397627677400969384129,
+            8699465782584489286649220703004908452310658536344237044384748396729714537752
+        ]
+    ];
+    uint256[2] validProofCIncorrect65535 = [
+        15243511192750540389584047533282711128331674168668611110707075373636037191200,
+        15598490172305429329926265640839405790579106649434256972132723537578154134101
+    ];
+    uint256[4] validPubSignalsIncorrect65535 = [
+        uint256(20243731532483464653008282803235725156917772166930941746636225099857223241802),
+        0, // isCorrect = false
+        12345, // guess
+        65535 // maxNumber
     ];
 
     address treasury;
@@ -113,7 +222,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_CorrectGuess_WithValidProof() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit correct guess
         vm.prank(guesser);
@@ -149,7 +258,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_IncorrectGuess_WithValidProof() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit incorrect guess
         vm.prank(guesser);
@@ -180,7 +289,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_MultipleGuesses_ThenCorrect() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // First incorrect guess
         vm.prank(guesser);
@@ -249,7 +358,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_AnyOrder() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit multiple guesses
         vm.prank(guesser);
@@ -291,16 +400,17 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_InvalidCommitment_Reverts() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         // Create proof with wrong commitment
-        uint256[3] memory wrongPubSignals = [
+        uint256[4] memory wrongPubSignals = [
             uint256(0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef), // wrong commitment
             1,
-            42
+            42,
+            100 // maxNumber
         ];
 
         vm.prank(creator);
@@ -312,7 +422,7 @@ contract GuessGameWithProofsTest is Test {
 
     function test_RespondToChallenge_InvalidProofForChallengeGuess() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Guesser submits guess 11
         vm.prank(guesser);
@@ -345,7 +455,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_AlreadyResponded_Reverts() public {
         // Create puzzle and submit guess
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
@@ -377,7 +487,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_PuzzleAlreadySolved_Reverts() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // First guess (correct)
         vm.prank(guesser);
@@ -409,7 +519,7 @@ contract GuessGameWithProofsTest is Test {
     function test_CancelPuzzle_AfterAllResponsesProcessed() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit guess
         vm.prank(guesser);
@@ -457,7 +567,7 @@ contract GuessGameWithProofsTest is Test {
     function test_RespondToChallenge_PuzzleForfeited_Reverts() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit guess
         vm.prank(guesser);
@@ -483,7 +593,7 @@ contract GuessGameWithProofsTest is Test {
     function test_ForfeitPuzzle_ChallengeAlreadyResponded_Reverts() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit two guesses
         vm.prank(guesser);
@@ -521,7 +631,7 @@ contract GuessGameWithProofsTest is Test {
     function test_ForfeitAndClaim_AfterPartialResponses() public {
         // Create puzzle with 0.12 ether bounty (0.24 total = 0.12 bounty + 0.12 collateral, divisible by 2)
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.24 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.24 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit three guesses
         vm.prank(guesser);
@@ -604,7 +714,7 @@ contract GuessGameWithProofsTest is Test {
 
         // ========== Step 1: Creator creates puzzle ==========
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         assertEq(creator.balance, creatorStartBalance - 0.2 ether);
 
@@ -761,7 +871,7 @@ contract GuessGameWithProofsTest is Test {
     function test_ResponsesInAnyOrder() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit 2 guesses in order (we only have proofs for 50 and 99)
         vm.prank(guesser);
@@ -818,7 +928,7 @@ contract GuessGameWithProofsTest is Test {
     function test_ForfeitClaimsInAnyOrder() public {
         // Create puzzle with bounty divisible by 4
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Create 4 guessers and submit guesses
         address guesser3 = makeAddr("guesser3");
@@ -906,7 +1016,7 @@ contract GuessGameWithProofsTest is Test {
     function test_ClaimStakeFromSolved() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesser1Start = guesser.balance;
         uint256 guesser2Start = guesser2.balance;
@@ -966,7 +1076,7 @@ contract GuessGameWithProofsTest is Test {
     function test_BountyDistributionWithRounding() public {
         // Create puzzle with bounty that won't divide evenly by 3
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Create 3 guessers
         address guesser3 = makeAddr("guesser3");
@@ -1031,7 +1141,7 @@ contract GuessGameWithProofsTest is Test {
     function test_MinimumStakeRequired() public {
         vm.prank(creator);
         vm.expectRevert(IGuessGame.InsufficientStake.selector);
-        game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0);
+        game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0, 100);
     }
 
     /**
@@ -1043,7 +1153,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_SameGuesserMultipleChallenges_DesignDecision() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesserStart = guesser.balance;
 
@@ -1087,7 +1197,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_CreatorCannotSelfGuess() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(creator);
         vm.expectRevert(IGuessGame.CreatorCannotGuess.selector);
@@ -1103,7 +1213,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_TwoPlayersClaim_OneWithMultipleGuesses() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.3 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.3 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesser1Start = guesser.balance;
         uint256 guesser2Start = guesser2.balance;
@@ -1163,7 +1273,7 @@ contract GuessGameWithProofsTest is Test {
 
         // ========== Puzzle 1: Will be forfeited ==========
         vm.prank(creator);
-        uint256 puzzleId1 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId1 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.01 ether}(puzzleId1, 50);
@@ -1173,7 +1283,7 @@ contract GuessGameWithProofsTest is Test {
 
         // ========== Puzzle 2: Will be solved by guesser2 ==========
         vm.prank(creator);
-        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.02 ether}(puzzleId2, 50);
@@ -1248,7 +1358,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_ClaimStakeFromSolved_MultipleGuessers() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesser1Start = guesser.balance;
         uint256 guesser2Start = guesser2.balance;
@@ -1304,14 +1414,14 @@ contract GuessGameWithProofsTest is Test {
 
         // Puzzle 1: Will be forfeited
         vm.prank(creator);
-        uint256 puzzleId1 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId1 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.01 ether}(puzzleId1, 50);
 
         // Puzzle 2: Will be solved by someone else
         vm.prank(creator);
-        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.02 ether}(puzzleId2, 50);
@@ -1364,7 +1474,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_Withdraw_MultipleTimes() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.01 ether}(puzzleId, 50);
@@ -1390,7 +1500,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_ClaimStakeFromSolved_GuesserWithMultipleChallenges() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesserStart = guesser.balance;
 
@@ -1430,7 +1540,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_ClaimStakeFromSolved_WinnerCannotClaim() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.01 ether}(puzzleId, 42); // correct
@@ -1455,7 +1565,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_AggregatesDecrementOnResponse() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Guesser submits 2 guesses
         vm.prank(guesser);
@@ -1499,7 +1609,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_ClaimStakeFromSolved_UnsolvedPuzzle() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         vm.prank(guesser);
         game.submitGuess{value: 0.01 ether}(puzzleId, 50);
@@ -1514,7 +1624,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_ClaimFromCancelledPuzzle() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Cancel immediately (no challenges)
         vm.prank(creator);
@@ -1542,7 +1652,7 @@ contract GuessGameWithProofsTest is Test {
 
         for (uint256 i = 0; i < 3; i++) {
             vm.prank(creator);
-            puzzleIds[i] = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+            puzzleIds[i] = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
             vm.prank(guesser);
             game.submitGuess{value: 0.01 ether}(puzzleIds[i], 50);
@@ -1576,7 +1686,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_SingleGuesserForfeit_GetsEntireBounty() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 1 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 1 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         uint256 guesserStart = guesser.balance;
 
@@ -1603,7 +1713,7 @@ contract GuessGameWithProofsTest is Test {
      */
     function test_MinStake_ForfeitClaim() public {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.00001 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.00001 ether, 100);
 
         uint256 guesserStart = guesser.balance;
 
@@ -1636,7 +1746,7 @@ contract GuessGameWithProofsTest is Test {
 
         // Create puzzle with 0.2 ether (0.1 bounty + 0.1 collateral)
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         assertEq(creator.balance, creatorStart - 0.2 ether);
 
@@ -1667,7 +1777,7 @@ contract GuessGameWithProofsTest is Test {
     function test_DuplicateGuessRejected() public {
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // First guess succeeds
         vm.prank(guesser);
@@ -1687,7 +1797,7 @@ contract GuessGameWithProofsTest is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.24 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.24 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit three guesses
         vm.prank(guesser);
@@ -1723,7 +1833,7 @@ contract GuessGameWithProofsTest is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit 2 wrong guesses
         vm.prank(guesser);
@@ -1771,7 +1881,7 @@ contract GuessGameWithProofsTest is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
         // Submit guess
         vm.prank(guesser);
@@ -1788,5 +1898,170 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId);
         assertEq(game.balances(guesser), 0.01 ether + 0.1 ether); // stake + entire bounty
+    }
+
+    // ============ Tests for maxNumber > 100 ============
+
+    /**
+     * @notice Test puzzle with maxNumber=1000 - correct guess
+     */
+    function test_MaxNumber1000_CorrectGuess() public {
+        // Create puzzle with maxNumber=1000
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 1000);
+
+        // Verify maxNumber stored correctly
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.maxNumber, 1000);
+
+        // Submit correct guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        uint256 guesserBalanceBefore = guesser.balance;
+
+        // Respond with valid proof for maxNumber=1000
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofACorrect1000,
+            validProofBCorrect1000,
+            validProofCCorrect1000,
+            validPubSignalsCorrect1000
+        );
+
+        // Verify puzzle is solved
+        assertTrue(game.getPuzzle(puzzleId).solved);
+
+        // Winner gets bounty + stake
+        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        assertEq(guesser.balance, guesserBalanceBefore + expectedPrize);
+    }
+
+    /**
+     * @notice Test puzzle with maxNumber=1000 - incorrect guess
+     */
+    function test_MaxNumber1000_IncorrectGuess() public {
+        // Create puzzle with maxNumber=1000
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 1000);
+
+        // Submit incorrect guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        uint256 guesserBalanceBefore = guesser.balance;
+
+        // Respond with valid proof for incorrect guess
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofAIncorrect1000,
+            validProofBIncorrect1000,
+            validProofCIncorrect1000,
+            validPubSignalsIncorrect1000
+        );
+
+        // Puzzle not solved
+        assertFalse(game.getPuzzle(puzzleId).solved);
+
+        // Guesser gets stake back
+        assertEq(guesser.balance, guesserBalanceBefore + 0.01 ether);
+    }
+
+    /**
+     * @notice Test puzzle with maxNumber=65535 (full 16-bit range) - large secret number
+     */
+    function test_MaxNumber65535_LargeSecret_CorrectGuess() public {
+        // Create puzzle with maxNumber=65535 and large secret (50000)
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_50000_999, 0.01 ether, 65535);
+
+        // Verify maxNumber stored correctly
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.maxNumber, 65535);
+
+        // Submit correct guess (50000)
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50000);
+
+        uint256 guesserBalanceBefore = guesser.balance;
+
+        // Respond with valid proof for maxNumber=65535
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofACorrect65535,
+            validProofBCorrect65535,
+            validProofCCorrect65535,
+            validPubSignalsCorrect65535
+        );
+
+        // Verify puzzle is solved
+        assertTrue(game.getPuzzle(puzzleId).solved);
+
+        // Winner gets bounty + stake
+        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        assertEq(guesser.balance, guesserBalanceBefore + expectedPrize);
+    }
+
+    /**
+     * @notice Test puzzle with maxNumber=65535 - incorrect guess
+     */
+    function test_MaxNumber65535_LargeSecret_IncorrectGuess() public {
+        // Create puzzle with maxNumber=65535 and large secret (50000)
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_50000_999, 0.01 ether, 65535);
+
+        // Submit incorrect guess (12345)
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 12345);
+
+        uint256 guesserBalanceBefore = guesser.balance;
+
+        // Respond with valid proof for incorrect guess
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofAIncorrect65535,
+            validProofBIncorrect65535,
+            validProofCIncorrect65535,
+            validPubSignalsIncorrect65535
+        );
+
+        // Puzzle not solved
+        assertFalse(game.getPuzzle(puzzleId).solved);
+
+        // Guesser gets stake back
+        assertEq(guesser.balance, guesserBalanceBefore + 0.01 ether);
+    }
+
+    /**
+     * @notice Test that proof with wrong maxNumber is rejected
+     */
+    function test_MaxNumber_MismatchRejected() public {
+        // Create puzzle with maxNumber=1000
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 1000);
+
+        // Submit guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Try to respond with proof for maxNumber=100 (mismatch)
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidProof.selector);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofACorrect,
+            validProofBCorrect,
+            validProofCCorrect,
+            validPubSignalsCorrect // This has maxNumber=100, but puzzle has maxNumber=1000
+        );
     }
 }
