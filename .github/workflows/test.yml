@@ -60,7 +60,7 @@ jobs:
 
       - name: Run coverage
         run: |
-          forge coverage --report summary --no-match-path "test/integration/*"
+          forge coverage --report summary --no-match-path "test/integration/*" --ir-minimum
         id: coverage
 
   integration-tests:
@@ -86,4 +86,4 @@ jobs:
         run: npm ci
 
       - name: Run FFI integration tests
-        run: forge test --match-path "test/integration/*" -vvv --ffi
+        run: forge test --match-path "test/integration/*" -vvv --ffi --fuzz-runs 5 --fuzz-seed ${{ github.run_id }}

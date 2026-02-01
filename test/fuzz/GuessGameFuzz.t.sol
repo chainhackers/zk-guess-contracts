@@ -20,23 +20,23 @@ contract GuessGameFuzz is Test {
     bytes32 constant COMMITMENT_42_123 = 0x1d869fb8246b6131377493aaaf1cc16a8284d4aedcb7277079df35d0d1d552d1;
 
     // Valid proof for incorrect guess (50) - used to respond without solving
-    uint256[2] validProofA_incorrect = [
-        3364672360492296507034511930302267018941894416535030435002742763862273853807,
-        10511255209593992143172534123880342191894873685592843814310184259000257709856
+    uint256[2] validProofAIncorrect = [
+        10852066913978342118218498818335408844066258321902599194444720468359168576214,
+        6965698820638077395094099877008034652702640564558429698785929019854255895452
     ];
-    uint256[2][2] validProofB_incorrect = [
+    uint256[2][2] validProofBIncorrect = [
         [
-            3526685943163558454366018228687147473376158293403445437898317517903797116104,
-            11964113483940569365060893273411920407938187050379733431404144880231651790024
+            1613230777238805011830229517807176666334104047967446217283376846766348057999,
+            4374229236798730817553670335020809672579377927876284581397418664965153211023
         ],
         [
-            15234279533641182618208416848613436479969910481895873895662974781727346179748,
-            16454688506885755244690896043981865850542161515309650429707773686412990768888
+            4520893247875616557226868523444705263309850113066582487089193591474052220970,
+            7766575812497568221119740140062493894108981945203859417355220016465955717634
         ]
     ];
-    uint256[2] validProofC_incorrect = [
-        3293058257413774448062971737532668348012548306946092786115196414980556574053,
-        15586935452123439844029511993836791229082913365766756898632685724149643980999
+    uint256[2] validProofCIncorrect = [
+        4156351497089605839121606963169954792875252974032590314960492405100124400333,
+        6066764750676488417561440637467884321186918175528620457428676808171983539025
     ];
 
     uint256 constant MIN_STAKE = 0.00001 ether;
@@ -76,7 +76,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
 
         // Track total stakes and challenges per guesser
         uint256 totalChallenges = 0;
@@ -92,7 +92,7 @@ contract GuessGameFuzz is Test {
                 uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, j))), MIN_STAKE, 1 ether);
 
                 vm.prank(guessers[i]);
-                game.submitGuess{value: stake}(puzzleId, totalChallenges); // Unique wrong guess
+                game.submitGuess{value: stake}(puzzleId, totalChallenges + 1); // Unique wrong guess (1-indexed)
 
                 challengeCounts[i]++;
                 stakeTotals[i] += stake;
@@ -142,7 +142,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_STAKE, 100);
 
         // Track expected values per guesser in arrays
         uint256[] memory expectedStakes = new uint256[](guessers.length);
@@ -157,7 +157,7 @@ contract GuessGameFuzz is Test {
             uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, "stake"))), MIN_STAKE, 0.1 ether);
 
             vm.prank(guessers[guesserIdx]);
-            uint256 challengeId = game.submitGuess{value: stake}(puzzleId, i); // Unique guess per challenge
+            uint256 challengeId = game.submitGuess{value: stake}(puzzleId, i + 1); // Unique guess per challenge (1-indexed)
 
             challengeIds[i] = challengeId;
             challengeGuessers[i] = guessers[guesserIdx];
@@ -193,15 +193,15 @@ contract GuessGameFuzz is Test {
             uint256 guesserIdx = _getGuesserIndex(guesser);
             uint256 stake = challengeStakes[challengeIdx];
 
-            uint256[3] memory pubSignals = [uint256(COMMITMENT_42_123), 0, i];
+            uint256[4] memory pubSignals = [uint256(COMMITMENT_42_123), 0, i, 100];
 
             vm.prank(creator);
             game.respondToChallenge(
                 puzzleId,
                 challengeIds[challengeIdx],
-                validProofA_incorrect,
-                validProofB_incorrect,
-                validProofC_incorrect,
+                validProofAIncorrect,
+                validProofBIncorrect,
+                validProofCIncorrect,
                 pubSignals
             );
 
@@ -236,7 +236,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
 
         uint256 totalStakes = 0;
         uint256[] memory stakes = new uint256[](numGuesses);
@@ -248,7 +248,7 @@ contract GuessGameFuzz is Test {
             uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i))), MIN_STAKE, 0.5 ether);
 
             vm.prank(guessers[guesserIdx]);
-            game.submitGuess{value: stake}(puzzleId, i); // Unique guess
+            game.submitGuess{value: stake}(puzzleId, i + 1); // Unique guess (1-indexed)
 
             stakes[i] = stake;
             guesserAddrs[i] = guessers[guesserIdx];
@@ -314,11 +314,11 @@ contract GuessGameFuzz is Test {
             bounties[i] = bounty;
 
             vm.prank(creator);
-            puzzleIds[i] = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE);
+            puzzleIds[i] = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
 
             // Single guesser submits to each puzzle (unique guess per puzzle)
             vm.prank(guessers[0]);
-            game.submitGuess{value: MIN_STAKE}(puzzleIds[i], i);
+            game.submitGuess{value: MIN_STAKE}(puzzleIds[i], i + 1);
         }
 
         // Warp and forfeit all puzzles
@@ -360,12 +360,12 @@ contract GuessGameFuzz is Test {
         numChallenges = uint8(bound(numChallenges, 1, 50));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 1000);
 
         // Submit challenges from single guesser (unique guess per challenge)
         for (uint256 i = 0; i < numChallenges; i++) {
             vm.prank(guessers[0]);
-            game.submitGuess{value: MIN_STAKE}(puzzleId, i);
+            game.submitGuess{value: MIN_STAKE}(puzzleId, i + 1);
         }
 
         // Forfeit
@@ -392,12 +392,12 @@ contract GuessGameFuzz is Test {
         numGuessers = uint8(bound(numGuessers, 2, 10));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
 
         // Each guesser submits exactly 1 challenge (unique guess per guesser)
         for (uint256 i = 0; i < numGuessers; i++) {
             vm.prank(guessers[i]);
-            game.submitGuess{value: MIN_STAKE}(puzzleId, i);
+            game.submitGuess{value: MIN_STAKE}(puzzleId, i + 1);
         }
 
         // Forfeit
@@ -439,14 +439,14 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_STAKE);
+        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_STAKE, 100);
 
         // Verify collateral stored correctly
         assertEq(game.getPuzzle(puzzleId).collateral, expectedCollateral);
 
         // Submit guess and forfeit
         vm.prank(guessers[0]);
-        game.submitGuess{value: MIN_STAKE}(puzzleId, 0);
+        game.submitGuess{value: MIN_STAKE}(puzzleId, 1);
 
         vm.warp(block.timestamp + RESPONSE_TIMEOUT + 1);
         game.forfeitPuzzle(puzzleId, 0);

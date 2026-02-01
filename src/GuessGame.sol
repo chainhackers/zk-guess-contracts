@@ -32,10 +32,15 @@ contract GuessGame is IGuessGame {
         treasury = _treasury;
     }
 
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired) external payable returns (uint256 puzzleId) {
+    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
+        external
+        payable
+        returns (uint256 puzzleId)
+    {
         // msg.value must be at least 2x MIN_BOUNTY (bounty + collateral)
         if (msg.value < MIN_BOUNTY * 2) revert InsufficientBounty();
         if (stakeRequired < MIN_STAKE) revert InsufficientStake();
+        if (maxNumber == 0 || maxNumber > 65535) revert InvalidMaxNumber();
 
         // Floor division: extra wei goes to bounty
         uint256 collateral = msg.value / 2;
@@ -51,13 +56,14 @@ contract GuessGame is IGuessGame {
             bounty: bounty,
             collateral: collateral,
             stakeRequired: stakeRequired,
+            maxNumber: maxNumber,
             challengeCount: 0,
             pendingChallenges: 0,
             lastChallengeTimestamp: 0,
             pendingAtForfeit: 0
         });
 
-        emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty);
+        emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty, maxNumber);
     }
 
     function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId) {
@@ -68,6 +74,7 @@ contract GuessGame is IGuessGame {
         if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (msg.sender == puzzle.creator) revert CreatorCannotGuess();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
+        if (guess == 0 || guess > puzzle.maxNumber) revert InvalidGuessRange();
         if (guessSubmitted[puzzleId][guess]) revert GuessAlreadySubmitted();
 
         guessSubmitted[puzzleId][guess] = true;
@@ -93,7 +100,7 @@ contract GuessGame is IGuessGame {
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[3] calldata _pubSignals
+        uint256[4] calldata _pubSignals
     ) external {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
@@ -109,14 +116,16 @@ contract GuessGame is IGuessGame {
         // Verify the proof using external verifier
         if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
 
-        // Extract public signals
+        // Extract public signals: [commitment, isCorrect, guess, maxNumber]
         bytes32 commitment = bytes32(_pubSignals[0]);
         bool isCorrect = _pubSignals[1] == 1;
         uint256 proofGuess = _pubSignals[2];
+        uint256 proofMaxNumber = _pubSignals[3];
 
-        // Verify commitment matches puzzle
+        // Verify proof matches puzzle parameters
         if (commitment != puzzle.commitment) revert InvalidProof();
         if (proofGuess != challenge.guess) revert InvalidProofForChallengeGuess();
+        if (proofMaxNumber != puzzle.maxNumber) revert InvalidProof();
 
         challenge.responded = true;
         puzzle.pendingChallenges--;

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Generate ZK proof for GuessGame using snarkjs
- * Usage: node scripts/generate-proof.js <number> <salt> <guess>
+ * Usage: node scripts/generate-proof.js <number> <salt> <guess> <maxNumber>
  * Output: JSON with pA, pB, pC, pubSignals formatted for Solidity
  *
- * Circuit inputs: number, salt, guess
- * Circuit outputs (public signals): commitment, isCorrect, guess
+ * Circuit inputs: number, salt, guess, maxNumber
+ * Circuit outputs (public signals): commitment, isCorrect, guess, maxNumber
  */
 
 const snarkjs = require("snarkjs");
@@ -15,12 +15,12 @@ const fs = require("fs");
 async function main() {
   const args = process.argv.slice(2);
 
-  if (args.length !== 3) {
-    console.error("Usage: node generate-proof.js <number> <salt> <guess>");
+  if (args.length !== 4) {
+    console.error("Usage: node generate-proof.js <number> <salt> <guess> <maxNumber>");
     process.exit(1);
   }
 
-  const [number, salt, guess] = args.map((x) => x.toString());
+  const [number, salt, guess, maxNumber] = args.map((x) => x.toString());
 
   // Paths to circuit artifacts
   const wasmPath = path.join(__dirname, "../circuits/guess.wasm");
@@ -40,7 +40,8 @@ async function main() {
   const input = {
     number: number,
     salt: salt,
-    guess: guess
+    guess: guess,
+    maxNumber: maxNumber
   };
 
   // Generate the proof
@@ -54,7 +55,7 @@ async function main() {
   // pA: [x, y]
   // pB: [[x1, x2], [y1, y2]] - note: swapped order for Solidity
   // pC: [x, y]
-  // pubSignals: [commitment, isCorrect, guess]
+  // pubSignals: [commitment, isCorrect, guess, maxNumber]
   const solidityProof = {
     pA: [proof.pi_a[0], proof.pi_a[1]],
     pB: [
