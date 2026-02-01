@@ -122,6 +122,27 @@ contract GuessGameTest is Test {
         vm.stopPrank();
     }
 
+    function test_SubmitGuess_InvalidGuessRange() public {
+        // Create puzzle with maxNumber = 100
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether, 100);
+
+        vm.startPrank(guesser);
+
+        // Guess 0 should fail
+        vm.expectRevert(IGuessGame.InvalidGuessRange.selector);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 0);
+
+        // Guess above maxNumber should fail
+        vm.expectRevert(IGuessGame.InvalidGuessRange.selector);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 101);
+
+        // Valid guess should succeed
+        game.submitGuess{value: 0.01 ether}(puzzleId, 100);
+
+        vm.stopPrank();
+    }
+
     function test_SubmitGuess_PuzzleCancelled() public {
         // Create puzzle
         vm.prank(creator);

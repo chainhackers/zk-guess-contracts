@@ -92,7 +92,7 @@ contract GuessGameFuzz is Test {
                 uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, j))), MIN_STAKE, 1 ether);
 
                 vm.prank(guessers[i]);
-                game.submitGuess{value: stake}(puzzleId, totalChallenges); // Unique wrong guess
+                game.submitGuess{value: stake}(puzzleId, totalChallenges + 1); // Unique wrong guess (1-indexed)
 
                 challengeCounts[i]++;
                 stakeTotals[i] += stake;
@@ -157,7 +157,7 @@ contract GuessGameFuzz is Test {
             uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i, "stake"))), MIN_STAKE, 0.1 ether);
 
             vm.prank(guessers[guesserIdx]);
-            uint256 challengeId = game.submitGuess{value: stake}(puzzleId, i); // Unique guess per challenge
+            uint256 challengeId = game.submitGuess{value: stake}(puzzleId, i + 1); // Unique guess per challenge (1-indexed)
 
             challengeIds[i] = challengeId;
             challengeGuessers[i] = guessers[guesserIdx];
@@ -248,7 +248,7 @@ contract GuessGameFuzz is Test {
             uint256 stake = bound(uint256(keccak256(abi.encode(stakeSeed, i))), MIN_STAKE, 0.5 ether);
 
             vm.prank(guessers[guesserIdx]);
-            game.submitGuess{value: stake}(puzzleId, i); // Unique guess
+            game.submitGuess{value: stake}(puzzleId, i + 1); // Unique guess (1-indexed)
 
             stakes[i] = stake;
             guesserAddrs[i] = guessers[guesserIdx];
@@ -318,7 +318,7 @@ contract GuessGameFuzz is Test {
 
             // Single guesser submits to each puzzle (unique guess per puzzle)
             vm.prank(guessers[0]);
-            game.submitGuess{value: MIN_STAKE}(puzzleIds[i], i);
+            game.submitGuess{value: MIN_STAKE}(puzzleIds[i], i + 1);
         }
 
         // Warp and forfeit all puzzles
@@ -360,12 +360,12 @@ contract GuessGameFuzz is Test {
         numChallenges = uint8(bound(numChallenges, 1, 50));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 1000);
 
         // Submit challenges from single guesser (unique guess per challenge)
         for (uint256 i = 0; i < numChallenges; i++) {
             vm.prank(guessers[0]);
-            game.submitGuess{value: MIN_STAKE}(puzzleId, i);
+            game.submitGuess{value: MIN_STAKE}(puzzleId, i + 1);
         }
 
         // Forfeit
@@ -397,7 +397,7 @@ contract GuessGameFuzz is Test {
         // Each guesser submits exactly 1 challenge (unique guess per guesser)
         for (uint256 i = 0; i < numGuessers; i++) {
             vm.prank(guessers[i]);
-            game.submitGuess{value: MIN_STAKE}(puzzleId, i);
+            game.submitGuess{value: MIN_STAKE}(puzzleId, i + 1);
         }
 
         // Forfeit
@@ -446,7 +446,7 @@ contract GuessGameFuzz is Test {
 
         // Submit guess and forfeit
         vm.prank(guessers[0]);
-        game.submitGuess{value: MIN_STAKE}(puzzleId, 0);
+        game.submitGuess{value: MIN_STAKE}(puzzleId, 1);
 
         vm.warp(block.timestamp + RESPONSE_TIMEOUT + 1);
         game.forfeitPuzzle(puzzleId, 0);

@@ -74,6 +74,7 @@ contract GuessGame is IGuessGame {
         if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (msg.sender == puzzle.creator) revert CreatorCannotGuess();
         if (msg.value < puzzle.stakeRequired) revert InsufficientStake();
+        if (guess == 0 || guess > puzzle.maxNumber) revert InvalidGuessRange();
         if (guessSubmitted[puzzleId][guess]) revert GuessAlreadySubmitted();
 
         guessSubmitted[puzzleId][guess] = true;

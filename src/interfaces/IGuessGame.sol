@@ -65,6 +65,7 @@ interface IGuessGame {
     error AlreadyClaimed();
     error NothingToWithdraw();
     error GuessAlreadySubmitted();
+    error InvalidGuessRange();
     error InvalidMaxNumber();
 
     // Functions
