@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IGroth16Verifier.sol";
 import "./interfaces/IGuessGame.sol";
 
-contract GuessGame is IGuessGame {
-    IGroth16Verifier public immutable verifier;
-    address public immutable treasury;
+contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgradeable {
+    IGroth16Verifier public verifier;
+    address public treasury;
     uint256 public puzzleCount;
 
     mapping(uint256 => Puzzle) public puzzles;
@@ -26,11 +29,23 @@ contract GuessGame is IGuessGame {
     uint256 public constant CANCEL_TIMEOUT = 1 days;
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
-    constructor(address _verifier, address _treasury) {
+    // Storage gap for future upgrades
+    uint256[50] private __gap;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _verifier, address _treasury) public initializer {
+        __Ownable_init(msg.sender);
+
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
         treasury = _treasury;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
         external
