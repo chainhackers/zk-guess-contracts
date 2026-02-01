@@ -12,11 +12,14 @@ contract GuessGameInvariants is Test {
     Groth16Verifier public verifier;
     GuessGameHandler public handler;
 
+    address treasury;
+
     function setUp() public {
         // Deploy contracts
         verifier = new Groth16Verifier();
-        game = new GuessGame(address(verifier));
-        handler = new GuessGameHandler(game, verifier);
+        treasury = makeAddr("treasury");
+        game = new GuessGame(address(verifier), treasury);
+        handler = new GuessGameHandler(game, verifier, treasury);
 
         // Configure invariant test
         targetContract(address(handler));
@@ -207,6 +210,41 @@ contract GuessGameInvariants is Test {
             if (puzzle.forfeited) {
                 // pendingAtForfeit should be > 0 (there was at least one timed-out challenge)
                 assert(puzzle.pendingAtForfeit > 0);
+            }
+        }
+    }
+
+    /**
+     * @notice Active puzzles should always have collateral == bounty (1:1 split)
+     */
+    function invariant_collateralEqualsBountyForActive() public view {
+        uint256 puzzleCount = game.puzzleCount();
+
+        for (uint256 i = 0; i < puzzleCount; i++) {
+            IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
+            if (puzzle.creator != address(0) && !puzzle.solved && !puzzle.cancelled && !puzzle.forfeited) {
+                assertEq(puzzle.collateral, puzzle.bounty, "Active puzzle: collateral != bounty");
+            }
+        }
+    }
+
+    /**
+     * @notice Treasury balance should never decrease - only receives slashed collateral
+     */
+    function invariant_treasuryMonotonicallyIncreases() public view {
+        // Treasury balance should be at least what we've tracked sending to it
+        assert(treasury.balance >= handler.ghostTreasuryReceived());
+    }
+
+    /**
+     * @notice Forfeited puzzles should have ghost collateral zeroed (sent to treasury)
+     */
+    function invariant_forfeitedCollateralZeroed() public view {
+        uint256 puzzleCount = game.puzzleCount();
+
+        for (uint256 i = 0; i < puzzleCount; i++) {
+            if (handler.ghostPuzzleForfeited(i)) {
+                assertEq(handler.ghostPuzzleCollateral(i), 0, "Forfeited puzzle collateral not zeroed");
             }
         }
     }
