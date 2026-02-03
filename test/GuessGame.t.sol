@@ -36,7 +36,7 @@ contract GuessGameTest is Test {
 
     function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
         GuessGame impl = new GuessGame();
-        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury));
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury, address(this)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return GuessGame(address(proxy));
     }
@@ -712,13 +712,13 @@ contract GuessGameTest is Test {
 
     function test_CannotReinitialize() public {
         vm.expectRevert();
-        game.initialize(address(verifier), treasury);
+        game.initialize(address(verifier), treasury, address(this));
     }
 
     function test_ImplementationCannotBeInitialized() public {
         GuessGame impl = new GuessGame();
         vm.expectRevert();
-        impl.initialize(address(verifier), treasury);
+        impl.initialize(address(verifier), treasury, address(this));
     }
 
     function test_OnlyOwnerCanUpgrade() public {

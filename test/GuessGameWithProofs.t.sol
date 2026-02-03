@@ -9,7 +9,7 @@ import "../src/generated/GuessVerifier.sol";
 contract GuessGameWithProofsTest is Test {
     function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
         GuessGame impl = new GuessGame();
-        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury));
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury, address(this)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return GuessGame(address(proxy));
     }

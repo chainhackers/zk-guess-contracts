@@ -53,6 +53,7 @@ interface IGuessGame {
     error ChallengeNotFound();
     error PuzzleNotFound();
     error InvalidVerifierAddress();
+    error InvalidOwnerAddress();
     error NothingToClaim();
     error HasPendingChallenges();
     error CancelTooSoon();

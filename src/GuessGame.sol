@@ -37,8 +37,9 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         _disableInitializers();
     }
 
-    function initialize(address _verifier, address _treasury) public initializer {
-        __Ownable_init(msg.sender);
+    function initialize(address _verifier, address _treasury, address _owner) public initializer {
+        if (_owner == address(0)) revert InvalidOwnerAddress();
+        __Ownable_init(_owner);
 
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);

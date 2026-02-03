@@ -23,7 +23,7 @@ contract DeployScript is Script {
         console.log("GuessGame implementation deployed at:", address(impl));
 
         // Deploy proxy with initialize call
-        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury));
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, msg.sender));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         console.log("GuessGame proxy deployed at:", address(proxy));
         console.log("Treasury address:", treasury);

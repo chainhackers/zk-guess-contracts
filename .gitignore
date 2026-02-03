@@ -28,3 +28,6 @@ states/
 # Debug info
 *.dbg.json
 *.tsbuildinfo
+
+# Deprecated scripts
+script/deprecated/
