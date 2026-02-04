@@ -32,5 +32,5 @@ states/
 # Deprecated scripts
 script/deprecated/
 
-# Circuit artifacts (copied from zk-guess-circuits)
-circuits/
+# Circuit artifacts - versioned directories are committed
+# circuits/
