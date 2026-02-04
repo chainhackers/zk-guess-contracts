@@ -22,9 +22,10 @@ async function main() {
 
   const [number, salt, guess, maxNumber] = args.map((x) => x.toString());
 
-  // Paths to circuit artifacts
-  const wasmPath = path.join(__dirname, "../circuits/guess.wasm");
-  const zkeyPath = path.join(__dirname, "../circuits/guess_final.zkey");
+  // Paths to circuit artifacts (versioned by verifier address)
+  const verifierAddr = "0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34";
+  const wasmPath = path.join(__dirname, `../circuits/${verifierAddr}/guess.wasm`);
+  const zkeyPath = path.join(__dirname, `../circuits/${verifierAddr}/guess_final.zkey`);
 
   // Verify files exist
   if (!fs.existsSync(wasmPath)) {

@@ -31,3 +31,6 @@ states/
 
 # Deprecated scripts
 script/deprecated/
+
+# Circuit artifacts (copied from zk-guess-circuits)
+circuits/
