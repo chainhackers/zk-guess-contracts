@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
 import "../src/generated/GuessVerifier.sol";
 
@@ -17,9 +18,14 @@ contract DeployScript is Script {
         Groth16Verifier verifier = new Groth16Verifier();
         console.log("GuessVerifier deployed at:", address(verifier));
 
-        // Deploy game with verifier address and treasury
-        GuessGame game = new GuessGame(address(verifier), treasury);
-        console.log("GuessGame deployed at:", address(game));
+        // Deploy implementation
+        GuessGame impl = new GuessGame();
+        console.log("GuessGame implementation deployed at:", address(impl));
+
+        // Deploy proxy with initialize call
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, msg.sender));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        console.log("GuessGame proxy deployed at:", address(proxy));
         console.log("Treasury address:", treasury);
 
         vm.stopBroadcast();

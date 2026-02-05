@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../src/GuessGame.sol";
 import "../../src/generated/GuessVerifier.sol";
 
@@ -10,6 +11,12 @@ import "../../src/generated/GuessVerifier.sol";
  * @notice Targeted fuzz tests for GuessGame arithmetic and invariants
  */
 contract GuessGameFuzz is Test {
+    function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
+        GuessGame impl = new GuessGame();
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury, address(this)));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        return GuessGame(address(proxy));
+    }
     Groth16Verifier public verifier;
     GuessGame public game;
 
@@ -49,7 +56,7 @@ contract GuessGameFuzz is Test {
     function setUp() public {
         verifier = new Groth16Verifier();
         treasury = makeAddr("treasury");
-        game = new GuessGame(address(verifier), treasury);
+        game = deployGameProxy(address(verifier), treasury);
 
         creator = makeAddr("creator");
         vm.deal(creator, 1000 ether);

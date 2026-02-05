@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
 import "../src/generated/GuessVerifier.sol";
 
@@ -29,8 +30,15 @@ contract GuessGameTest is Test {
 
         // Deploy verifier first
         verifier = new Groth16Verifier();
-        // Deploy game with verifier address and treasury
-        game = new GuessGame(address(verifier), treasury);
+        // Deploy game via proxy
+        game = deployGameProxy(address(verifier), treasury);
+    }
+
+    function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
+        GuessGame impl = new GuessGame();
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury, address(this)));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        return GuessGame(address(proxy));
     }
 
     function test_CreatePuzzle() public {
@@ -638,7 +646,7 @@ contract GuessGameTest is Test {
     function test_ForfeitRevertsIfTreasuryRejects() public {
         // Deploy game with reverting treasury
         RejectingReceiver badTreasury = new RejectingReceiver();
-        GuessGame gameWithBadTreasury = new GuessGame(address(verifier), address(badTreasury));
+        GuessGame gameWithBadTreasury = deployGameProxy(address(verifier), address(badTreasury));
 
         vm.prank(creator);
         uint256 puzzleId = gameWithBadTreasury.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether, 100);
@@ -698,6 +706,68 @@ contract GuessGameTest is Test {
         game.cancelPuzzle(puzzleId);
 
         assertEq(treasury.balance, treasuryBefore);
+    }
+
+    // ============ UUPS Upgrade Tests ============
+
+    function test_CannotReinitialize() public {
+        vm.expectRevert();
+        game.initialize(address(verifier), treasury, address(this));
+    }
+
+    function test_ImplementationCannotBeInitialized() public {
+        GuessGame impl = new GuessGame();
+        vm.expectRevert();
+        impl.initialize(address(verifier), treasury, address(this));
+    }
+
+    function test_OnlyOwnerCanUpgrade() public {
+        GuessGame newImpl = new GuessGame();
+
+        vm.prank(anyone);
+        vm.expectRevert();
+        game.upgradeToAndCall(address(newImpl), "");
+    }
+
+    function test_OwnerCanUpgrade() public {
+        // Create a puzzle before upgrade
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether, 100);
+
+        // Deploy new implementation
+        GuessGame newImpl = new GuessGame();
+
+        // Owner (test contract) upgrades
+        game.upgradeToAndCall(address(newImpl), "");
+
+        // State preserved after upgrade
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.creator, creator);
+        assertEq(puzzle.bounty, 0.1 ether);
+        assertEq(puzzle.collateral, 0.1 ether);
+        assertEq(game.puzzleCount(), 1);
+    }
+
+    function test_UpgradePreservesActiveGame() public {
+        // Create puzzle and submit guess
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.01 ether, 100);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Verify pre-upgrade state
+        assertEq(game.getPuzzle(puzzleId).pendingChallenges, 1);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 1);
+
+        // Upgrade
+        GuessGame newImpl = new GuessGame();
+        game.upgradeToAndCall(address(newImpl), "");
+
+        // State preserved
+        assertEq(game.getPuzzle(puzzleId).pendingChallenges, 1);
+        assertEq(game.guesserChallengeCount(puzzleId, guesser), 1);
+        assertEq(game.guesserStakeTotal(puzzleId, guesser), 0.01 ether);
     }
 }
 

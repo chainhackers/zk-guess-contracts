@@ -4,6 +4,13 @@ out = "out"
 libs = ["lib"]
 ffi = true
 via_ir = true  # Required for snarkjs-generated verifier with 4 public signals
+evm_version = "paris"  # Required for chains without EIP-3855 (PUSH0) support
+cbor_metadata = false  # Make bytecode deterministic for CREATE2 address prediction
+bytecode_hash = "none"  # Required when cbor_metadata is false
+remappings = [
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/"
+]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 

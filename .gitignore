@@ -28,3 +28,9 @@ states/
 # Debug info
 *.dbg.json
 *.tsbuildinfo
+
+# Deprecated scripts
+script/deprecated/
+
+# Circuit artifacts - versioned directories are committed
+# circuits/

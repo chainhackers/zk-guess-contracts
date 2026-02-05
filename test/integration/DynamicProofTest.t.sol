@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../src/GuessGame.sol";
 import "../../src/generated/GuessVerifier.sol";
 import "../utils/ProofGenerator.sol";
@@ -34,6 +35,13 @@ contract DynamicProofTest is Test, ProofGenerator {
     address guesser;
     address treasury;
 
+    function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
+        GuessGame impl = new GuessGame();
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (_verifier, _treasury, address(this)));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        return GuessGame(address(proxy));
+    }
+
     function setUp() public {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
@@ -43,7 +51,7 @@ contract DynamicProofTest is Test, ProofGenerator {
         vm.deal(guesser, 10 ether);
 
         verifier = new Groth16Verifier();
-        game = new GuessGame(address(verifier), treasury);
+        game = deployGameProxy(address(verifier), treasury);
     }
 
     /**
