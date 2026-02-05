@@ -73,7 +73,7 @@ contract GuessGameInvariants is Test {
             if (puzzle.creator != address(0)) {
                 // If not cancelled/solved/forfeited, bounty should be at least MIN_BOUNTY
                 if (!puzzle.cancelled && !puzzle.solved && !puzzle.forfeited) {
-                    assert(puzzle.bounty >= 0.001 ether);
+                    assert(puzzle.bounty >= 0.0001 ether);
                 }
             }
         }
@@ -148,7 +148,7 @@ contract GuessGameInvariants is Test {
         for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             if (puzzle.creator != address(0) && !puzzle.solved && !puzzle.cancelled && !puzzle.forfeited) {
-                assert(puzzle.bounty >= 0.001 ether);
+                assert(puzzle.bounty >= 0.0001 ether);
             }
         }
     }
@@ -223,15 +223,16 @@ contract GuessGameInvariants is Test {
     }
 
     /**
-     * @notice Active puzzles should always have collateral == bounty (1:1 split)
+     * @notice Active puzzles should have bounty exactly equal to MIN_BOUNTY (collateral is optional)
      */
-    function invariant_collateralEqualsBountyForActive() public view {
+    function invariant_bountyIsFixedMinBounty() public view {
         uint256 puzzleCount = game.puzzleCount();
 
         for (uint256 i = 0; i < puzzleCount; i++) {
             IGuessGame.Puzzle memory puzzle = game.getPuzzle(i);
             if (puzzle.creator != address(0) && !puzzle.solved && !puzzle.cancelled && !puzzle.forfeited) {
-                assertEq(puzzle.collateral, puzzle.bounty, "Active puzzle: collateral != bounty");
+                // Bounty should be exactly MIN_BOUNTY (0.0001 ether)
+                assertEq(puzzle.bounty, 0.0001 ether, "Active puzzle: bounty != MIN_BOUNTY");
             }
         }
     }

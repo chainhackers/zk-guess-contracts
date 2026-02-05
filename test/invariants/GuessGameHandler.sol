@@ -35,9 +35,9 @@ contract GuessGameHandler is Test {
     address[] public guessers;
 
     // Bounds for fuzzing
-    uint256 constant MIN_STAKE = 0.001 ether;
+    uint256 constant MIN_STAKE = 0.00001 ether;
     uint256 constant MAX_STAKE = 1 ether;
-    uint256 constant MIN_BOUNTY = 0.001 ether;
+    uint256 constant MIN_BOUNTY = 0.0001 ether;
     uint256 constant MAX_BOUNTY = 10 ether;
 
     // Valid proofs for testing (from actual circuit)
@@ -124,23 +124,23 @@ contract GuessGameHandler is Test {
     }
 
     // Handler functions
-    function createPuzzle(uint256 bountyAmount, uint256 stakeRequired, uint256 creatorSeed)
+    function createPuzzle(uint256 collateralAmount, uint256 stakeRequired, uint256 creatorSeed)
         public
-        boundBounty(bountyAmount)
+        boundBounty(collateralAmount)
         boundStake(stakeRequired)
         useActor(creators, creatorSeed)
     {
-        // Calculate total amount (bounty + collateral, 1:1)
-        uint256 totalAmount = bountyAmount * 2;
+        // New economics: bounty = MIN_BOUNTY (fixed), collateral = variable (optional)
+        uint256 totalAmount = MIN_BOUNTY + collateralAmount;
 
         // Fund the creator
         vm.deal(creators[creatorSeed % creators.length], totalAmount);
 
         try game.createPuzzle{value: totalAmount}(COMMITMENT_42_123, stakeRequired, 100) returns (uint256 puzzleId) {
-            // Update ghost variables (bounty is half of total)
+            // Update ghost variables
             ghostPuzzleExists[puzzleId] = true;
-            ghostPuzzleBounty[puzzleId] = bountyAmount;
-            ghostPuzzleCollateral[puzzleId] = bountyAmount;
+            ghostPuzzleBounty[puzzleId] = MIN_BOUNTY;
+            ghostPuzzleCollateral[puzzleId] = collateralAmount;
             ghostPuzzleCreator[puzzleId] = creators[creatorSeed % creators.length];
             ghostTotalContractFunds += totalAmount;
         } catch {

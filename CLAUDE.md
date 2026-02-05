@@ -23,8 +23,8 @@ forge build
 # Run all tests (fast, excludes integration)
 forge test --no-match-path "test/integration/*"
 
-# Run all tests including slow FFI integration tests
-forge test --ffi
+# Run all tests including slow FFI integration tests (~10-30 min)
+forge test
 
 # Run tests with gas reporting
 forge test --gas-report
@@ -108,6 +108,12 @@ Tests use Foundry's testing framework with the following patterns:
 - Mock proofs for testing (actual ZK proofs generated off-chain)
 - Use `vm.prank()` for simulating different actors
 - Use `vm.expectRevert()` for testing error conditions
+
+## Writing Style
+
+- Avoid filler words like "implement", "add", "create" in issue/task titles
+- Prefer descriptive nouns: "UUPS upgradeable proxy" not "Implement UUPS upgradeable proxy"
+- Never commit CLAUDE.md
 
 ## Deployment Configuration
 

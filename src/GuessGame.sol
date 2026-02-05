@@ -24,8 +24,8 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     // Internal balances for withdrawal
     mapping(address => uint256) public balances;
 
-    uint256 constant MIN_BOUNTY = 0.001 ether;
-    uint256 constant MIN_STAKE = 0.00001 ether;
+    uint256 public constant MIN_BOUNTY = 0.0001 ether;
+    uint256 public constant MIN_STAKE = 0.00001 ether;
     uint256 public constant CANCEL_TIMEOUT = 1 days;
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
@@ -53,14 +53,13 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         payable
         returns (uint256 puzzleId)
     {
-        // msg.value must be at least 2x MIN_BOUNTY (bounty + collateral)
-        if (msg.value < MIN_BOUNTY * 2) revert InsufficientBounty();
+        if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
         if (stakeRequired < MIN_STAKE) revert InsufficientStake();
         if (maxNumber == 0 || maxNumber > 65535) revert InvalidMaxNumber();
 
-        // Floor division: extra wei goes to bounty
-        uint256 collateral = msg.value / 2;
-        uint256 bounty = msg.value - collateral;
+        // Bounty is MIN_BOUNTY, rest is optional collateral (slashable deposit)
+        uint256 bounty = MIN_BOUNTY;
+        uint256 collateral = msg.value - bounty;
 
         puzzleId = puzzleCount++;
         puzzles[puzzleId] = Puzzle({
@@ -76,6 +75,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             challengeCount: 0,
             pendingChallenges: 0,
             lastChallengeTimestamp: 0,
+            lastResponseTime: 0,
             pendingAtForfeit: 0
         });
 
@@ -145,6 +145,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         challenge.responded = true;
         puzzle.pendingChallenges--;
+        puzzle.lastResponseTime = block.timestamp;
 
         // Decrement guesser aggregates
         guesserStakeTotal[puzzleId][challenge.guesser] -= challenge.stake;
@@ -200,11 +201,16 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (puzzle.cancelled) revert PuzzleCancelledError();
         if (puzzle.forfeited) revert PuzzleForfeitedError();
 
-        // Verify the provided challenge has timed out
+        // Verify the provided challenge is pending (proves there are pending challenges)
         Challenge storage challenge = puzzleChallenges[puzzleId][timedOutChallengeId];
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
-        if (block.timestamp < challenge.timestamp + RESPONSE_TIMEOUT) revert NoTimedOutChallenge();
+
+        // Check if creator is inactive (rolling deadline)
+        // Reference time is when creator last showed activity
+        // If never responded, use the provided challenge's timestamp as the starting point
+        uint256 referenceTime = puzzle.lastResponseTime > 0 ? puzzle.lastResponseTime : challenge.timestamp;
+        if (block.timestamp < referenceTime + RESPONSE_TIMEOUT) revert CreatorStillActive();
 
         // Mark puzzle as forfeited
         puzzle.forfeited = true;
@@ -212,7 +218,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         emit PuzzleForfeited(puzzleId);
 
-        // Slash collateral to treasury
+        // Slash collateral to treasury (if any)
         if (puzzle.collateral > 0) {
             emit CollateralSlashed(puzzleId, puzzle.collateral);
             (bool success,) = treasury.call{value: puzzle.collateral}("");
