@@ -258,7 +258,7 @@ contract GuessGameWithProofsTest is Test {
         assertEq(challenge.responded, true);
 
         // Verify winner received bounty + stake
-        uint256 expectedPrize = 0.1 ether + 0.01 ether; // bounty + stake
+        uint256 expectedPrize = 0.0001 ether + 0.01 ether; // bounty + stake
         assertEq(guesser.balance, guesserBalanceBefore + expectedPrize);
     }
 
@@ -339,7 +339,7 @@ contract GuessGameWithProofsTest is Test {
         assertEq(guesser2.balance, guesser2BalanceBefore + 0.01 ether);
 
         IGuessGame.Puzzle memory puzzleAfterIncorrect = game.getPuzzle(puzzleId);
-        assertEq(puzzleAfterIncorrect.bounty, 0.1 ether); // Bounty unchanged
+        assertEq(puzzleAfterIncorrect.bounty, 0.0001 ether); // Bounty unchanged
         assertEq(puzzleAfterIncorrect.pendingChallenges, 0);
 
         // Now submit correct guess
@@ -358,7 +358,7 @@ contract GuessGameWithProofsTest is Test {
         assertEq(puzzleFinal.solved, true);
 
         // Winner gets bounty + stake back
-        uint256 expectedWinnerPrize = 0.1 ether + 0.01 ether;
+        uint256 expectedWinnerPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser.balance, guesserBalanceBefore - 0.01 ether + expectedWinnerPrize);
     }
 
@@ -636,7 +636,7 @@ contract GuessGameWithProofsTest is Test {
     }
 
     function test_ForfeitAndClaim_AfterPartialResponses() public {
-        // Create puzzle with 0.12 ether bounty (0.24 total = 0.12 bounty + 0.12 collateral, divisible by 2)
+        // Create puzzle (bounty = MIN_BOUNTY = 0.0001, collateral = 0.2399)
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.24 ether}(COMMITMENT_42_123, 0.01 ether, 100);
 
@@ -680,9 +680,9 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser3);
         game.claimFromForfeited(puzzleId);
 
-        // Each gets stake (0.01) + bounty share (0.12 / 2 = 0.06)
-        assertEq(game.balances(guesser2), 0.01 ether + 0.06 ether);
-        assertEq(game.balances(guesser3), 0.01 ether + 0.06 ether);
+        // Each gets stake (0.01) + bounty share (0.0001 / 2 = 0.00005)
+        assertEq(game.balances(guesser2), 0.01 ether + 0.00005 ether);
+        assertEq(game.balances(guesser3), 0.01 ether + 0.00005 ether);
 
         // Withdraw
         uint256 guesser2BalanceBefore = guesser2.balance;
@@ -693,8 +693,8 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser3);
         game.withdraw();
 
-        assertEq(guesser2.balance, guesser2BalanceBefore + 0.07 ether);
-        assertEq(guesser3.balance, guesser3BalanceBefore + 0.07 ether);
+        assertEq(guesser2.balance, guesser2BalanceBefore + 0.01005 ether);
+        assertEq(guesser3.balance, guesser3BalanceBefore + 0.01005 ether);
 
         // guesser (who was responded to) has no pending challenges to claim
         vm.prank(guesser);
@@ -727,8 +727,8 @@ contract GuessGameWithProofsTest is Test {
 
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
         assertEq(puzzle.creator, creator);
-        assertEq(puzzle.bounty, 0.1 ether);
-        assertEq(puzzle.collateral, 0.1 ether);
+        assertEq(puzzle.bounty, 0.0001 ether);
+        assertEq(puzzle.collateral, 0.1999 ether);
         assertEq(puzzle.solved, false);
 
         // ========== Step 2: 2 guessers submit wrong guesses ==========
@@ -820,7 +820,7 @@ contract GuessGameWithProofsTest is Test {
         puzzle = game.getPuzzle(puzzleId);
         assertEq(puzzle.solved, false);
         assertEq(puzzle.pendingChallenges, 0);
-        assertEq(puzzle.bounty, 0.1 ether); // Bounty intact
+        assertEq(puzzle.bounty, 0.0001 ether); // Bounty intact
 
         // ========== Step 5: 3rd guesser submits the right answer ==========
         address guesser3 = makeAddr("guesser3");
@@ -848,13 +848,13 @@ contract GuessGameWithProofsTest is Test {
         assertEq(puzzle.pendingChallenges, 0);
 
         // Winner (guesser3) gets bounty + stake
-        uint256 expectedWinnerPrize = 0.1 ether + 0.01 ether;
+        uint256 expectedWinnerPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser3.balance, guesser3StartBalance - 0.01 ether + expectedWinnerPrize);
-        assertEq(guesser3.balance, guesser3StartBalance + 0.1 ether); // Net gain = bounty
+        assertEq(guesser3.balance, guesser3StartBalance + 0.0001 ether); // Net gain = bounty
 
         // Creator's ETH balance is down 0.2 ether (initial payment), but collateral credited to internal balance
         assertEq(creator.balance, creatorStartBalance - 0.2 ether);
-        assertEq(game.balances(creator), 0.1 ether); // Collateral returned
+        assertEq(game.balances(creator), 0.1999 ether); // Collateral returned
 
         // Guesser 1 and 2 are back to original balances (stakes returned)
         assertEq(guesser.balance, guesser1StartBalance);
@@ -971,9 +971,9 @@ contract GuessGameWithProofsTest is Test {
         assertEq(puzzle.forfeited, true);
         assertEq(puzzle.pendingAtForfeit, 4);
 
-        // Bounty is 0.1 ether (half of 0.2 ether total)
-        // Each guesser should get: stake (0.01) + bounty share (0.1 / 4 = 0.025)
-        uint256 expectedPayout = 0.01 ether + 0.025 ether;
+        // Bounty is MIN_BOUNTY (0.0001 ether), collateral is 0.1999 ether
+        // Each guesser should get: stake (0.01) + bounty share (0.0001 / 4 = 0.000025)
+        uint256 expectedPayout = 0.01 ether + 0.000025 ether;
 
         // Claim in order: 4, 2, 1, 3 (not submission order) - single call per guesser
         vm.prank(guesser4);
@@ -1002,11 +1002,11 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser3);
         game.withdraw();
 
-        // Verify net gains: each guesser gained 0.025 ether (their share of 0.1 ether bounty / 4)
-        assertEq(guesser.balance, guesser1Start + 0.025 ether);
-        assertEq(guesser2.balance, guesser2Start + 0.025 ether);
-        assertEq(guesser3.balance, guesser3Start + 0.025 ether);
-        assertEq(guesser4.balance, guesser4Start + 0.025 ether);
+        // Verify net gains: each guesser gained 0.000025 ether (their share of 0.0001 ether bounty / 4)
+        assertEq(guesser.balance, guesser1Start + 0.000025 ether);
+        assertEq(guesser2.balance, guesser2Start + 0.000025 ether);
+        assertEq(guesser3.balance, guesser3Start + 0.000025 ether);
+        assertEq(guesser4.balance, guesser4Start + 0.000025 ether);
     }
 
     // ============ Protocol Hole Tests (These SHOULD FAIL until fixed) ============
@@ -1043,7 +1043,7 @@ contract GuessGameWithProofsTest is Test {
         );
 
         // Guesser 1 wins bounty + stake
-        assertEq(guesser.balance, guesser1Start + 0.1 ether);
+        assertEq(guesser.balance, guesser1Start + 0.0001 ether);
 
         // Puzzle is solved, guesser 2's challenge is still pending
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
@@ -1064,7 +1064,7 @@ contract GuessGameWithProofsTest is Test {
         assertEq(guesser2.balance, guesser2Start, "Guesser 2 should have stake returned");
 
         // Creator has collateral in internal balance
-        assertEq(game.balances(creator), 0.1 ether, "Creator should have collateral in balance");
+        assertEq(game.balances(creator), 0.1999 ether, "Creator should have collateral in balance");
 
         // Creator withdraws collateral
         vm.prank(creator);
@@ -1108,7 +1108,7 @@ contract GuessGameWithProofsTest is Test {
         game.forfeitPuzzle(puzzleId, 0);
 
         // Calculate expected shares
-        uint256 bounty = 0.1 ether;
+        uint256 bounty = 0.0001 ether;
         uint256 bountyShare = bounty / 3; // 33333333333333333 wei
 
         // All guessers claim (single call each)
@@ -1187,14 +1187,14 @@ contract GuessGameWithProofsTest is Test {
         game.claimFromForfeited(puzzleId);
 
         // Balance credited: 3 stakes + entire bounty (3/3 share)
-        assertEq(game.balances(guesser), 0.03 ether + 0.1 ether);
+        assertEq(game.balances(guesser), 0.03 ether + 0.0001 ether);
 
         // Withdraw
         vm.prank(guesser);
         game.withdraw();
 
         // Guesser gets stakes back + entire bounty
-        assertEq(guesser.balance, guesserStart + 0.1 ether);
+        assertEq(guesser.balance, guesserStart + 0.0001 ether);
     }
 
     /**
@@ -1250,11 +1250,12 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser2);
         game.claimFromForfeited(puzzleId);
 
-        // Guesser1: stake (0.03) + bounty share (0.15 * 2/3 = 0.1)
-        assertEq(game.balances(guesser), 0.03 ether + 0.1 ether);
+        // Guesser1: stake (0.03) + bounty share (0.0001 * 2/3 = 0.000066..)
+        // With integer division: 0.0001 * 2 / 3 = 66666... wei
+        assertEq(game.balances(guesser), 0.03 ether + 66666666666666);
 
-        // Guesser2: stake (0.01) + bounty share (0.15 * 1/3 = 0.05)
-        assertEq(game.balances(guesser2), 0.01 ether + 0.05 ether);
+        // Guesser2: stake (0.01) + bounty share (0.0001 * 1/3 = 0.000033..)
+        assertEq(game.balances(guesser2), 0.01 ether + 33333333333333);
 
         // Withdraw
         vm.prank(guesser);
@@ -1262,9 +1263,9 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser2);
         game.withdraw();
 
-        // Verify final balances
-        assertEq(guesser.balance, guesser1Start + 0.1 ether); // gained bounty share
-        assertEq(guesser2.balance, guesser2Start + 0.05 ether); // gained bounty share
+        // Verify final balances (net gain from bounty share)
+        assertEq(guesser.balance, guesser1Start + 66666666666666); // gained bounty share
+        assertEq(guesser2.balance, guesser2Start + 33333333333333); // gained bounty share
     }
 
     /**
@@ -1305,11 +1306,11 @@ contract GuessGameWithProofsTest is Test {
         // Both claim from puzzle 1
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId1);
-        // guesser: 0.01 stake + 0.05 bounty (0.1/2)
+        // guesser: 0.01 stake + 0.00005 bounty (0.0001/2)
 
         vm.prank(guesser2);
         game.claimFromForfeited(puzzleId1);
-        // guesser2: 0.01 stake + 0.05 bounty (0.1/2)
+        // guesser2: 0.01 stake + 0.00005 bounty (0.0001/2)
 
         // ========== Puzzle 2: Solve ==========
         // Reset time for puzzle 2 responses
@@ -1327,14 +1328,14 @@ contract GuessGameWithProofsTest is Test {
         game.respondToChallenge(
             puzzleId2, 1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
         );
-        // guesser2 gets 0.02 stake + 0.2 bounty immediately
+        // guesser2 gets 0.02 stake + 0.0001 bounty immediately
 
         // ========== Check balances before withdraw ==========
-        // Guesser: 0.01 + 0.05 from puzzle 1 forfeit claim
-        assertEq(game.balances(guesser), 0.06 ether);
+        // Guesser: 0.01 + 0.00005 from puzzle 1 forfeit claim
+        assertEq(game.balances(guesser), 0.01 ether + 0.00005 ether);
 
-        // Guesser2: 0.01 + 0.05 from puzzle 1 forfeit claim
-        assertEq(game.balances(guesser2), 0.06 ether);
+        // Guesser2: 0.01 + 0.00005 from puzzle 1 forfeit claim
+        assertEq(game.balances(guesser2), 0.01 ether + 0.00005 ether);
 
         // ========== Withdraw ==========
         vm.prank(guesser);
@@ -1344,18 +1345,18 @@ contract GuessGameWithProofsTest is Test {
         game.withdraw();
 
         // ========== Verify final balances ==========
-        // Bounty is 0.1 ether per puzzle (half of 0.2 ether total)
+        // Bounty is MIN_BOUNTY (0.0001 ether) per puzzle, collateral is 0.1999 ether
         // Guesser: started, paid 0.01+0.02=0.03 stakes, got back:
         //   - 0.02 immediately from puzzle2 response
-        //   - 0.06 from withdraw (puzzle1 claim: 0.01 stake + 0.05 bounty share)
-        // Net: +0.05 (bounty share from puzzle1)
-        assertEq(guesser.balance, guesser1Start + 0.05 ether);
+        //   - 0.01005 from withdraw (puzzle1 claim: 0.01 stake + 0.00005 bounty share)
+        // Net: +0.00005 (bounty share from puzzle1)
+        assertEq(guesser.balance, guesser1Start + 0.00005 ether);
 
         // Guesser2: started, paid 0.01+0.02=0.03 stakes, got back:
-        //   - 0.02+0.1=0.12 immediately from puzzle2 win (bounty is 0.1 ether)
-        //   - 0.06 from withdraw (puzzle1 claim: 0.01 stake + 0.05 bounty share)
-        // Net: +0.05 (puzzle1 share) + 0.1 (puzzle2 bounty) = +0.15
-        assertEq(guesser2.balance, guesser2Start + 0.15 ether);
+        //   - 0.02+0.0001=0.0201 immediately from puzzle2 win (bounty is 0.0001 ether)
+        //   - 0.01005 from withdraw (puzzle1 claim: 0.01 stake + 0.00005 bounty share)
+        // Net: +0.00005 (puzzle1 share) + 0.0001 (puzzle2 bounty) = +0.00015
+        assertEq(guesser2.balance, guesser2Start + 0.00015 ether);
     }
 
     // ============ Additional Coverage Tests ============
@@ -1391,7 +1392,7 @@ contract GuessGameWithProofsTest is Test {
         );
 
         // guesser3 wins bounty + stake immediately
-        assertEq(guesser3.balance, guesser3Start + 0.1 ether);
+        assertEq(guesser3.balance, guesser3Start + 0.0001 ether);
 
         // Other guessers claim their stakes back
         vm.prank(guesser);
@@ -1442,7 +1443,7 @@ contract GuessGameWithProofsTest is Test {
 
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId1);
-        // guesser: 0.01 stake + 0.1 bounty = 0.11
+        // guesser: 0.01 stake + 0.0001 bounty = 0.0101
 
         // Solve puzzle 2
         vm.warp(block.timestamp - game.RESPONSE_TIMEOUT());
@@ -1456,15 +1457,15 @@ contract GuessGameWithProofsTest is Test {
         game.claimStakeFromSolved(puzzleId2);
         // guesser: adds 0.02 stake
 
-        // Combined balance
-        assertEq(game.balances(guesser), 0.11 ether + 0.02 ether);
+        // Combined balance: 0.0101 + 0.02 = 0.0301
+        assertEq(game.balances(guesser), 0.0101 ether + 0.02 ether);
 
         // Single withdraw gets everything
         vm.prank(guesser);
         game.withdraw();
 
-        // Net: paid 0.03 stakes, got 0.13 back = +0.10 (bounty from puzzle1)
-        assertEq(guesser.balance, guesserStart + 0.1 ether);
+        // Net: paid 0.03 stakes, got 0.0301 back = +0.0001 (bounty from puzzle1)
+        assertEq(guesser.balance, guesserStart + 0.0001 ether);
     }
 
     /**
@@ -1677,15 +1678,15 @@ contract GuessGameWithProofsTest is Test {
             game.claimFromForfeited(puzzleIds[i]);
         }
 
-        // Balance = 3 * (0.01 stake + 0.1 bounty) = 0.33 ether
-        assertEq(game.balances(guesser), 0.33 ether);
+        // Balance = 3 * (0.01 stake + 0.0001 bounty) = 0.0303 ether
+        assertEq(game.balances(guesser), 0.0303 ether);
 
         // Single withdraw
         vm.prank(guesser);
         game.withdraw();
 
-        // Net gain = 3 * 0.1 bounty = 0.3 ether
-        assertEq(guesser.balance, guesserStart + 0.3 ether);
+        // Net gain = 3 * 0.0001 bounty = 0.0003 ether
+        assertEq(guesser.balance, guesserStart + 0.0003 ether);
     }
 
     /**
@@ -1706,13 +1707,13 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId);
 
-        // Gets stake + entire bounty
-        assertEq(game.balances(guesser), 0.01 ether + 0.5 ether);
+        // Gets stake + entire bounty (bounty is MIN_BOUNTY = 0.0001)
+        assertEq(game.balances(guesser), 0.01 ether + 0.0001 ether);
 
         vm.prank(guesser);
         game.withdraw();
 
-        assertEq(guesser.balance, guesserStart + 0.5 ether);
+        assertEq(guesser.balance, guesserStart + 0.0001 ether);
     }
 
     /**
@@ -1735,12 +1736,12 @@ contract GuessGameWithProofsTest is Test {
         game.claimFromForfeited(puzzleId);
 
         // Gets MIN_STAKE + entire bounty
-        assertEq(game.balances(guesser), 0.00001 ether + 0.1 ether);
+        assertEq(game.balances(guesser), 0.00001 ether + 0.0001 ether);
 
         vm.prank(guesser);
         game.withdraw();
 
-        assertEq(guesser.balance, guesserStart + 0.1 ether);
+        assertEq(guesser.balance, guesserStart + 0.0001 ether);
     }
 
     // ============ Collateral Tests ============
@@ -1768,14 +1769,14 @@ contract GuessGameWithProofsTest is Test {
         );
 
         // Creator's collateral should be credited to internal balance
-        assertEq(game.balances(creator), 0.1 ether);
+        assertEq(game.balances(creator), 0.1999 ether);
 
         // Creator withdraws collateral
         vm.prank(creator);
         game.withdraw();
 
-        // Creator now has: original - 0.2 (paid) + 0.1 (collateral) = original - 0.1 (lost bounty only)
-        assertEq(creator.balance, creatorStart - 0.1 ether);
+        // Creator now has: original - 0.2 (paid) + 0.1999 (collateral) = original - 0.0001 (lost bounty only)
+        assertEq(creator.balance, creatorStart - 0.0001 ether);
     }
 
     /**
@@ -1828,8 +1829,8 @@ contract GuessGameWithProofsTest is Test {
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         game.forfeitPuzzle(puzzleId, 1);
 
-        // Treasury gets FULL collateral (0.12 ether), not partial
-        assertEq(treasury.balance, treasuryStart + 0.12 ether);
+        // Treasury gets FULL collateral (0.2399 ether = 0.24 - MIN_BOUNTY), not partial
+        assertEq(treasury.balance, treasuryStart + 0.2399 ether);
     }
 
     /**
@@ -1899,12 +1900,12 @@ contract GuessGameWithProofsTest is Test {
         game.forfeitPuzzle(puzzleId, challengeId);
 
         // Treasury receives collateral
-        assertEq(treasury.balance, treasuryStart + 0.1 ether);
+        assertEq(treasury.balance, treasuryStart + 0.1999 ether);
 
         // Guesser can still claim bounty share
         vm.prank(guesser);
         game.claimFromForfeited(puzzleId);
-        assertEq(game.balances(guesser), 0.01 ether + 0.1 ether); // stake + entire bounty
+        assertEq(game.balances(guesser), 0.01 ether + 0.0001 ether); // stake + entire bounty
     }
 
     // ============ Tests for maxNumber > 100 ============
@@ -1942,7 +1943,7 @@ contract GuessGameWithProofsTest is Test {
         assertTrue(game.getPuzzle(puzzleId).solved);
 
         // Winner gets bounty + stake
-        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        uint256 expectedPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser.balance, guesserBalanceBefore + expectedPrize);
     }
 
@@ -2011,7 +2012,7 @@ contract GuessGameWithProofsTest is Test {
         assertTrue(game.getPuzzle(puzzleId).solved);
 
         // Winner gets bounty + stake
-        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        uint256 expectedPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser.balance, guesserBalanceBefore + expectedPrize);
     }
 
@@ -2070,5 +2071,181 @@ contract GuessGameWithProofsTest is Test {
             validProofCCorrect,
             validPubSignalsCorrect // This has maxNumber=100, but puzzle has maxNumber=1000
         );
+    }
+
+    // ============ Additional High Priority Tests ============
+
+    /**
+     * @notice Verify that responding to one challenge resets the timeout clock
+     *
+     * - Create puzzle, submit 2 guesses
+     * - Respond to first guess (lastResponseTime updated)
+     * - Wait RESPONSE_TIMEOUT from original challenge.timestamp (not enough)
+     * - Try forfeit - should fail because lastResponseTime reset the clock
+     * - Wait RESPONSE_TIMEOUT from lastResponseTime
+     * - Forfeit should now succeed
+     */
+    function test_ForfeitTimeoutResetsOnResponse() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
+
+        // Submit two guesses
+        vm.prank(guesser);
+        uint256 challengeId1 = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+        uint256 challenge1Timestamp = block.timestamp;
+
+        // Advance time slightly before submitting second guess
+        vm.warp(block.timestamp + 1 hours);
+
+        vm.prank(guesser2);
+        uint256 challengeId2 = game.submitGuess{value: 0.01 ether}(puzzleId, 99);
+
+        // Respond to first guess (this should update lastResponseTime)
+        vm.warp(block.timestamp + 1 hours);
+        uint256 responseTime = block.timestamp;
+
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId1,
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
+        );
+
+        // Verify lastResponseTime was updated
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.lastResponseTime, responseTime);
+        assertEq(puzzle.pendingChallenges, 1); // Only challenge 2 is pending
+
+        // Warp to RESPONSE_TIMEOUT from original challenge1 timestamp
+        // This would be enough time from the first challenge, but NOT from the response
+        vm.warp(challenge1Timestamp + game.RESPONSE_TIMEOUT() + 1);
+
+        // If responseTime is later than challenge1Timestamp, we haven't waited long enough
+        // Try to forfeit - should fail because creator responded within timeout
+        if (block.timestamp < responseTime + game.RESPONSE_TIMEOUT()) {
+            vm.expectRevert(IGuessGame.CreatorStillActive.selector);
+            game.forfeitPuzzle(puzzleId, challengeId2);
+        }
+
+        // Now warp to RESPONSE_TIMEOUT from the response time
+        vm.warp(responseTime + game.RESPONSE_TIMEOUT());
+
+        // Forfeit should succeed now
+        game.forfeitPuzzle(puzzleId, challengeId2);
+
+        puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.forfeited, true);
+    }
+
+    /**
+     * @notice Test that puzzle with all challenges responded cannot be forfeited
+     *
+     * - Create puzzle, submit guess
+     * - Respond to challenge (pendingChallenges = 0)
+     * - Warp past RESPONSE_TIMEOUT
+     * - Try forfeit - should fail (ChallengeAlreadyResponded on any challenge, or no pending challenges)
+     */
+    function test_CannotForfeitAfterAllChallengesResponded() public {
+        // Create puzzle
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
+
+        // Submit guess
+        vm.prank(guesser);
+        uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 50);
+
+        // Respond to challenge
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            validProofAIncorrect,
+            validProofBIncorrect,
+            validProofCIncorrect,
+            validPubSignalsIncorrect
+        );
+
+        // Verify pendingChallenges is 0
+        IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
+        assertEq(puzzle.pendingChallenges, 0);
+        assertFalse(puzzle.solved);
+        assertFalse(puzzle.forfeited);
+
+        // Warp past RESPONSE_TIMEOUT
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+
+        // Try to forfeit using the responded challenge - should fail
+        vm.expectRevert(IGuessGame.ChallengeAlreadyResponded.selector);
+        game.forfeitPuzzle(puzzleId, challengeId);
+
+        // Puzzle should still not be forfeited
+        puzzle = game.getPuzzle(puzzleId);
+        assertFalse(puzzle.forfeited);
+    }
+
+    /**
+     * @notice Test balance accumulation from solved puzzle claim + forfeited puzzle claim
+     *
+     * - Guesser participates in puzzle1 (forfeited) and puzzle2 (solved, not winner)
+     * - Claim from both puzzles
+     * - Verify total balance = forfeit_claim + solved_stake_claim
+     * - Withdraw once, verify correct total
+     */
+    function test_BalanceAccumulation_ForfeitAndSolvedClaims() public {
+        uint256 guesserStart = guesser.balance;
+
+        // ========== Puzzle 1: Will be forfeited ==========
+        vm.prank(creator);
+        uint256 puzzleId1 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.01 ether}(puzzleId1, 50);
+
+        // ========== Puzzle 2: Will be solved by guesser2 ==========
+        vm.prank(creator);
+        uint256 puzzleId2 = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.01 ether, 100);
+
+        vm.prank(guesser);
+        game.submitGuess{value: 0.02 ether}(puzzleId2, 50); // Wrong guess
+
+        vm.prank(guesser2);
+        game.submitGuess{value: 0.01 ether}(puzzleId2, 42); // Correct guess
+
+        // ========== Forfeit puzzle 1 ==========
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId1, 0);
+
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId1);
+        // Claim: 0.01 stake + 0.0001 bounty = 0.0101
+
+        // ========== Solve puzzle 2 ==========
+        vm.warp(block.timestamp - game.RESPONSE_TIMEOUT()); // Reset time for responses
+
+        // Respond to guesser2's correct guess - puzzle solved
+        vm.prank(creator);
+        game.respondToChallenge(
+            puzzleId2, 1, validProofACorrect, validProofBCorrect, validProofCCorrect, validPubSignalsCorrect
+        );
+
+        // Guesser claims stake from solved puzzle
+        vm.prank(guesser);
+        game.claimStakeFromSolved(puzzleId2);
+        // Claim: 0.02 stake
+
+        // ========== Verify combined balance ==========
+        // Total: 0.0101 (from forfeit) + 0.02 (from solved) = 0.0301
+        assertEq(game.balances(guesser), 0.0301 ether);
+
+        // ========== Single withdraw ==========
+        vm.prank(guesser);
+        game.withdraw();
+
+        // Net: paid 0.03 stakes, got 0.0301 back = +0.0001 (bounty from puzzle1)
+        assertEq(guesser.balance, guesserStart + 0.0001 ether);
     }
 }
