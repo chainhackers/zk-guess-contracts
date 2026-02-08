@@ -130,6 +130,9 @@ interface IGuessGame {
     /// @notice Thrown when initializing with zero owner address
     error InvalidOwnerAddress();
 
+    /// @notice Thrown when initializing with zero treasury address
+    error InvalidTreasuryAddress();
+
     /// @notice Thrown when there's nothing to claim
     error NothingToClaim();
 
