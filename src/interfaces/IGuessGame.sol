@@ -182,7 +182,8 @@ interface IGuessGame {
     /// @param stakeRequired Minimum stake per guess (must be >= MIN_STAKE)
     /// @param maxNumber Maximum valid guess (1 to 65535)
     /// @return puzzleId The ID of the created puzzle
-    /// @dev msg.value is split: bounty goes to prize pool, remainder is optional collateral
+    /// @dev msg.value must be >= MIN_BOUNTY. Bounty is fixed at MIN_BOUNTY, any excess becomes
+    ///      optional collateral. Collateral is slashed to treasury on forfeit, returned on cancel/solve.
     function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
         external
         payable
