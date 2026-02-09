@@ -59,7 +59,7 @@ forge test --match-path test/GuessGame.t.sol
 ## Deployed Contracts (Base Mainnet)
 
 - **GuessGame (Proxy)**: [`0xfa37cdcff862114c88c8e19b10b362d611a2c45f`](https://basescan.org/address/0xfa37cdcff862114c88c8e19b10b362d611a2c45f)
-- Implementation: [`0x7e512ba5e1a14460b9de1b546a98c59dab272e55`](https://basescan.org/address/0x7e512ba5e1a14460b9de1b546a98c59dab272e55)
+- Implementation: [`0xa73cD3792623Bc21ecA8ae5226a23Dd953A5592A`](https://basescan.org/address/0xa73cD3792623Bc21ecA8ae5226a23Dd953A5592A)
 - Verifier: [`0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34`](https://basescan.org/address/0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34)
 
 ## Architecture
