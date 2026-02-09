@@ -2124,12 +2124,9 @@ contract GuessGameWithProofsTest is Test {
         // This would be enough time from the first challenge, but NOT from the response
         vm.warp(challenge1Timestamp + game.RESPONSE_TIMEOUT() + 1);
 
-        // If responseTime is later than challenge1Timestamp, we haven't waited long enough
-        // Try to forfeit - should fail because creator responded within timeout
-        if (block.timestamp < responseTime + game.RESPONSE_TIMEOUT()) {
-            vm.expectRevert(IGuessGame.CreatorStillActive.selector);
-            game.forfeitPuzzle(puzzleId, challengeId2);
-        }
+        // Forfeit should fail - creator responded within timeout (lastResponseTime resets the clock)
+        vm.expectRevert(IGuessGame.CreatorStillActive.selector);
+        game.forfeitPuzzle(puzzleId, challengeId2);
 
         // Now warp to RESPONSE_TIMEOUT from the response time
         vm.warp(responseTime + game.RESPONSE_TIMEOUT());
