@@ -18,7 +18,7 @@ Returns the full puzzle struct. Key fields:
 | `solved` | A guesser guessed correctly |
 | `cancelled` | Creator cancelled the puzzle |
 | `forfeited` | Creator stopped responding and puzzle was forfeited |
-| `bounty` | Prize pool (fixed at 0.0001 ETH) |
+| `bounty` | Prize pool (creator-set, minimum 0.0001 ETH) |
 | `collateral` | Creator's slashable deposit (any ETH sent above MIN_BOUNTY) |
 | `pendingChallenges` | Number of unanswered guesses |
 | `lastChallengeTimestamp` | When the most recent guess was submitted |

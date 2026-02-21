@@ -136,7 +136,9 @@ contract GuessGameHandler is Test {
         // Fund the creator
         vm.deal(creators[creatorSeed % creators.length], totalAmount);
 
-        try game.createPuzzle{value: totalAmount}(COMMITMENT_42_123, stakeRequired, 100) returns (uint256 puzzleId) {
+        try game.createPuzzle{value: totalAmount}(COMMITMENT_42_123, MIN_BOUNTY, stakeRequired, 100) returns (
+            uint256 puzzleId
+        ) {
             // Update ghost variables
             ghostPuzzleExists[puzzleId] = true;
             ghostPuzzleBounty[puzzleId] = MIN_BOUNTY;

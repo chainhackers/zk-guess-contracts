@@ -91,17 +91,16 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /// @inheritdoc IGuessGame
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
+    function createPuzzle(bytes32 commitment, uint256 bounty, uint256 stakeRequired, uint256 maxNumber)
         external
         payable
         returns (uint256 puzzleId)
     {
-        if (msg.value < MIN_BOUNTY) revert InsufficientBounty();
+        if (bounty < MIN_BOUNTY) revert InsufficientBounty();
+        if (msg.value < bounty) revert InsufficientDeposit();
         if (stakeRequired < MIN_STAKE) revert InsufficientStake();
         if (maxNumber == 0 || maxNumber > 65535) revert InvalidMaxNumber();
 
-        // Bounty is MIN_BOUNTY, rest is optional collateral (slashable deposit)
-        uint256 bounty = MIN_BOUNTY;
         uint256 collateral = msg.value - bounty;
 
         puzzleId = puzzleCount++;

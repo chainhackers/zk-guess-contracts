@@ -91,8 +91,11 @@ interface IGuessGame {
 
     // ============ Errors ============
 
-    /// @notice Thrown when puzzle creation value is below MIN_BOUNTY
+    /// @notice Thrown when bounty parameter is below MIN_BOUNTY
     error InsufficientBounty();
+
+    /// @notice Thrown when msg.value is less than bounty
+    error InsufficientDeposit();
 
     /// @notice Thrown when stake required is below MIN_STAKE
     error InsufficientStake();
@@ -179,12 +182,13 @@ interface IGuessGame {
 
     /// @notice Create a new puzzle with a commitment to a secret number
     /// @param commitment Poseidon hash of (secret, salt)
+    /// @param bounty Prize amount (must be >= MIN_BOUNTY)
     /// @param stakeRequired Minimum stake per guess (must be >= MIN_STAKE)
     /// @param maxNumber Maximum valid guess (1 to 65535)
     /// @return puzzleId The ID of the created puzzle
-    /// @dev msg.value must be >= MIN_BOUNTY. Bounty is fixed at MIN_BOUNTY, any excess becomes
-    ///      optional collateral. Collateral is slashed to treasury on forfeit, returned on cancel/solve.
-    function createPuzzle(bytes32 commitment, uint256 stakeRequired, uint256 maxNumber)
+    /// @dev msg.value must be >= bounty. Any excess (msg.value - bounty) becomes optional collateral.
+    ///      Collateral is slashed to treasury on forfeit, returned on cancel/solve.
+    function createPuzzle(bytes32 commitment, uint256 bounty, uint256 stakeRequired, uint256 maxNumber)
         external
         payable
         returns (uint256 puzzleId);

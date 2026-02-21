@@ -82,7 +82,8 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle (bounty = MIN_BOUNTY, collateral = extra)
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Track total stakes and challenges per guesser
         uint256 totalChallenges = 0;
@@ -148,7 +149,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Track expected values per guesser in arrays
         uint256[] memory expectedStakes = new uint256[](guessers.length);
@@ -244,7 +245,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         uint256 totalStakes = 0;
         uint256[] memory stakes = new uint256[](numGuesses);
@@ -320,7 +321,8 @@ contract GuessGameFuzz is Test {
             uint256 collateral = bound(uint256(keccak256(abi.encode(collateralSeed, i))), 0, 1 ether);
 
             vm.prank(creator);
-            puzzleIds[i] = game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_STAKE, 100);
+            puzzleIds[i] =
+                game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
             // Single guesser submits to each puzzle (unique guess per puzzle)
             vm.prank(guessers[0]);
@@ -366,7 +368,8 @@ contract GuessGameFuzz is Test {
         numChallenges = uint8(bound(numChallenges, 1, 50));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_STAKE, 1000);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 1000);
 
         // Submit challenges from single guesser (unique guess per challenge)
         for (uint256 i = 0; i < numChallenges; i++) {
@@ -398,7 +401,8 @@ contract GuessGameFuzz is Test {
         numGuessers = uint8(bound(numGuessers, 2, 10));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Each guesser submits exactly 1 challenge (unique guess per guesser)
         for (uint256 i = 0; i < numGuessers; i++) {
@@ -446,7 +450,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Verify collateral stored correctly
         assertEq(game.getPuzzle(puzzleId).collateral, expectedCollateral);

@@ -68,7 +68,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit correct guess
         vm.prank(guesser);
@@ -112,7 +112,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit incorrect guess
         vm.prank(guesser);
@@ -156,7 +156,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit wrong guess
         vm.prank(guesser);
@@ -211,7 +211,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Guesser 1 submits wrong guess
         vm.prank(guesser);
@@ -274,7 +274,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit wrong guess
         vm.prank(guesser);
@@ -322,7 +322,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle with this commitment
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Verify stored commitment matches
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);
