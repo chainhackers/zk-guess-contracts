@@ -47,8 +47,7 @@ contract GuessGameFuzz is Test {
     ];
 
     uint256 constant MIN_STAKE = 0.00001 ether;
-    uint256 constant MIN_BOUNTY = 0.001 ether;
-    uint256 constant MIN_TOTAL = MIN_BOUNTY * 2; // bounty + collateral
+    uint256 constant MIN_BOUNTY = 0.0001 ether;
     uint256 constant RESPONSE_TIMEOUT = 1 days;
 
     address treasury;
@@ -72,18 +71,19 @@ contract GuessGameFuzz is Test {
     /**
      * @notice Fuzz test: Bounty distribution dust should be minimal
      * @dev When N guessers claim from a forfeited puzzle, total distributed should be close to original bounty
-     * @param bounty The puzzle bounty amount (fuzzed)
+     * @param collateral The optional collateral amount (fuzzed)
      * @param numGuessers Number of guessers (1-10)
      * @param stakeSeed Seed for generating varying stake amounts
      */
-    function testFuzz_BountyDistributionDust(uint256 bounty, uint8 numGuessers, uint256 stakeSeed) public {
-        // Bound inputs
-        bounty = bound(bounty, MIN_BOUNTY, 100 ether);
+    function testFuzz_BountyDistributionDust(uint256 collateral, uint8 numGuessers, uint256 stakeSeed) public {
+        // Bound inputs - bounty is always MIN_BOUNTY, collateral is extra
+        collateral = bound(collateral, 0, 100 ether);
         numGuessers = uint8(bound(numGuessers, 1, 10));
 
-        // Create puzzle
+        // Create puzzle (bounty = MIN_BOUNTY, collateral = extra)
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Track total stakes and challenges per guesser
         uint256 totalChallenges = 0;
@@ -120,8 +120,8 @@ contract GuessGameFuzz is Test {
             game.claimFromForfeited(puzzleId);
 
             uint256 balance = game.balances(guessers[i]);
-            // Balance should be stake + bounty share
-            uint256 expectedBountyShare = (bounty * challengeCounts[i]) / totalChallenges;
+            // Balance should be stake + bounty share (bounty is fixed at MIN_BOUNTY)
+            uint256 expectedBountyShare = (MIN_BOUNTY * challengeCounts[i]) / totalChallenges;
             totalDistributedBounty += expectedBountyShare;
 
             // Verify each guesser gets at least their stake back
@@ -129,7 +129,7 @@ contract GuessGameFuzz is Test {
         }
 
         // Total distributed bounty should be close to original (allowing for integer division dust)
-        uint256 dust = bounty - totalDistributedBounty;
+        uint256 dust = MIN_BOUNTY - totalDistributedBounty;
 
         // Dust should be less than numGuessers (at most 1 wei lost per division)
         assertLe(dust, totalChallenges, "Too much bounty dust lost");
@@ -149,7 +149,7 @@ contract GuessGameFuzz is Test {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: 2 ether}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Track expected values per guesser in arrays
         uint256[] memory expectedStakes = new uint256[](guessers.length);
@@ -232,18 +232,20 @@ contract GuessGameFuzz is Test {
     /**
      * @notice Fuzz test: Contract solvency - always has enough ETH
      * @dev Contract balance should always cover all obligations
-     * @param bounty Puzzle bounty
+     * @param collateral Optional collateral amount
      * @param numGuesses Number of guesses
      * @param stakeSeed Seed for stakes
      */
-    function testFuzz_ContractSolvency(uint256 bounty, uint8 numGuesses, uint256 stakeSeed) public {
-        // Bound inputs
-        bounty = bound(bounty, MIN_BOUNTY, 10 ether);
+    function testFuzz_ContractSolvency(uint256 collateral, uint8 numGuesses, uint256 stakeSeed) public {
+        // Bound inputs - bounty is always MIN_BOUNTY
+        collateral = bound(collateral, 0, 10 ether);
         numGuesses = uint8(bound(numGuesses, 1, 15));
+
+        uint256 totalDeposit = MIN_BOUNTY + collateral;
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         uint256 totalStakes = 0;
         uint256[] memory stakes = new uint256[](numGuesses);
@@ -262,9 +264,8 @@ contract GuessGameFuzz is Test {
             totalStakes += stake;
         }
 
-        // Contract should hold total (bounty + collateral) + all stakes
-        // bounty * 2 because we sent bounty * 2 but the puzzle stores bounty = total / 2
-        assertEq(address(game).balance, bounty * 2 + totalStakes, "Contract balance mismatch");
+        // Contract should hold total deposit + all stakes
+        assertEq(address(game).balance, totalDeposit + totalStakes, "Contract balance mismatch");
 
         // Warp and forfeit
         vm.warp(block.timestamp + RESPONSE_TIMEOUT + 1);
@@ -307,21 +308,21 @@ contract GuessGameFuzz is Test {
      * @notice Fuzz test: Stake accumulation across multiple puzzles
      * @dev Balances should correctly accumulate from multiple puzzle claims
      * @param numPuzzles Number of puzzles to create
-     * @param bountySeed Seed for bounty amounts
+     * @param collateralSeed Seed for collateral amounts
      */
-    function testFuzz_MultiPuzzleBalanceAccumulation(uint8 numPuzzles, uint256 bountySeed) public {
+    function testFuzz_MultiPuzzleBalanceAccumulation(uint8 numPuzzles, uint256 collateralSeed) public {
         numPuzzles = uint8(bound(numPuzzles, 2, 5));
 
         uint256[] memory puzzleIds = new uint256[](numPuzzles);
-        uint256[] memory bounties = new uint256[](numPuzzles);
 
         // Create puzzles and submit guesses
         for (uint256 i = 0; i < numPuzzles; i++) {
-            uint256 bounty = bound(uint256(keccak256(abi.encode(bountySeed, i))), MIN_BOUNTY, 1 ether);
-            bounties[i] = bounty;
+            // Fuzz the collateral amount (bounty is always MIN_BOUNTY)
+            uint256 collateral = bound(uint256(keccak256(abi.encode(collateralSeed, i))), 0, 1 ether);
 
             vm.prank(creator);
-            puzzleIds[i] = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
+            puzzleIds[i] =
+                game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
             // Single guesser submits to each puzzle (unique guess per puzzle)
             vm.prank(guessers[0]);
@@ -341,8 +342,8 @@ contract GuessGameFuzz is Test {
             vm.prank(guessers[0]);
             game.claimFromForfeited(puzzleIds[i]);
 
-            // Expected: stake + full bounty (single guesser gets all)
-            expectedTotal += MIN_STAKE + bounties[i];
+            // Expected: stake + full bounty (single guesser gets MIN_BOUNTY per puzzle)
+            expectedTotal += MIN_STAKE + MIN_BOUNTY;
         }
 
         // Verify accumulated balance
@@ -359,15 +360,16 @@ contract GuessGameFuzz is Test {
     /**
      * @notice Fuzz test: Division edge cases in bounty share calculation
      * @dev Test bounty / pendingAtForfeit with edge case values
-     * @param bounty Bounty amount
+     * @param collateral Optional collateral amount
      * @param numChallenges Number of challenges
      */
-    function testFuzz_BountyShareDivision(uint256 bounty, uint8 numChallenges) public {
-        bounty = bound(bounty, MIN_BOUNTY, 100 ether);
+    function testFuzz_BountyShareDivision(uint256 collateral, uint8 numChallenges) public {
+        collateral = bound(collateral, 0, 100 ether);
         numChallenges = uint8(bound(numChallenges, 1, 50));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 1000);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 1000);
 
         // Submit challenges from single guesser (unique guess per challenge)
         for (uint256 i = 0; i < numChallenges; i++) {
@@ -379,27 +381,28 @@ contract GuessGameFuzz is Test {
         vm.warp(block.timestamp + RESPONSE_TIMEOUT + 1);
         game.forfeitPuzzle(puzzleId, 0);
 
-        // Claim - single guesser should get full bounty
+        // Claim - single guesser should get full bounty (MIN_BOUNTY)
         vm.prank(guessers[0]);
         game.claimFromForfeited(puzzleId);
 
-        // bountyShare = (bounty * numChallenges) / numChallenges = bounty (exactly)
-        uint256 expectedBalance = MIN_STAKE * numChallenges + bounty;
+        // bountyShare = (MIN_BOUNTY * numChallenges) / numChallenges = MIN_BOUNTY (exactly)
+        uint256 expectedBalance = MIN_STAKE * numChallenges + MIN_BOUNTY;
         assertEq(game.balances(guessers[0]), expectedBalance, "Single guesser should get full bounty");
     }
 
     /**
      * @notice Fuzz test: Equal distribution among guessers
      * @dev When all guessers have equal challenges, distribution should be equal
-     * @param bounty Bounty amount
+     * @param collateral Optional collateral amount
      * @param numGuessers Number of guessers (each with 1 challenge)
      */
-    function testFuzz_EqualDistribution(uint256 bounty, uint8 numGuessers) public {
-        bounty = bound(bounty, MIN_BOUNTY, 10 ether);
+    function testFuzz_EqualDistribution(uint256 collateral, uint8 numGuessers) public {
+        collateral = bound(collateral, 0, 10 ether);
         numGuessers = uint8(bound(numGuessers, 2, 10));
 
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: bounty * 2}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId =
+            game.createPuzzle{value: MIN_BOUNTY + collateral}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Each guesser submits exactly 1 challenge (unique guess per guesser)
         for (uint256 i = 0; i < numGuessers; i++) {
@@ -419,34 +422,35 @@ contract GuessGameFuzz is Test {
             claimedAmounts[i] = game.balances(guessers[i]);
         }
 
-        // All amounts should be equal (stake + bounty/numGuessers)
-        uint256 expectedBountyShare = bounty / numGuessers;
+        // All amounts should be equal (stake + MIN_BOUNTY/numGuessers)
+        uint256 expectedBountyShare = MIN_BOUNTY / numGuessers;
         uint256 expectedTotal = MIN_STAKE + expectedBountyShare;
 
         for (uint256 i = 0; i < numGuessers; i++) {
             assertEq(claimedAmounts[i], expectedTotal, "Unequal distribution");
         }
 
-        // Total distributed should be close to bounty (within numGuessers-1 wei dust)
+        // Total distributed should be close to MIN_BOUNTY (within numGuessers-1 wei dust)
         uint256 totalDistributed = expectedBountyShare * numGuessers;
-        uint256 dust = bounty - totalDistributed;
+        uint256 dust = MIN_BOUNTY - totalDistributed;
         assertLt(dust, numGuessers, "Too much dust");
     }
 
     /**
      * @notice Fuzz test: Collateral slash sends exact amount to treasury
-     * @dev Treasury should receive exactly totalDeposit / 2
+     * @dev Treasury should receive exactly the collateral (totalDeposit - MIN_BOUNTY)
      * @param totalDeposit Total amount sent to createPuzzle
      */
     function testFuzz_CollateralSlashExactAmount(uint256 totalDeposit) public {
-        totalDeposit = bound(totalDeposit, MIN_TOTAL, 100 ether);
+        totalDeposit = bound(totalDeposit, MIN_BOUNTY, 100 ether);
 
-        uint256 expectedCollateral = totalDeposit / 2;
+        // Collateral = totalDeposit - MIN_BOUNTY
+        uint256 expectedCollateral = totalDeposit - MIN_BOUNTY;
         uint256 treasuryBefore = treasury.balance;
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_STAKE, 100);
+        uint256 puzzleId = game.createPuzzle{value: totalDeposit}(COMMITMENT_42_123, MIN_BOUNTY, MIN_STAKE, 100);
 
         // Verify collateral stored correctly
         assertEq(game.getPuzzle(puzzleId).collateral, expectedCollateral);
@@ -458,7 +462,7 @@ contract GuessGameFuzz is Test {
         vm.warp(block.timestamp + RESPONSE_TIMEOUT + 1);
         game.forfeitPuzzle(puzzleId, 0);
 
-        // Treasury receives exactly the collateral
+        // Treasury receives exactly the collateral (if any)
         assertEq(treasury.balance, treasuryBefore + expectedCollateral);
     }
 

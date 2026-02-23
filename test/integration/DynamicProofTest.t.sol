@@ -68,7 +68,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit correct guess
         vm.prank(guesser);
@@ -93,7 +93,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         assertTrue(puzzle.solved, "Puzzle should be solved");
 
         // Verify winner received bounty + stake
-        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        // Bounty is MIN_BOUNTY (0.0001 ether), not half of msg.value
+        uint256 expectedPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser.balance, guesserBalanceBefore + expectedPrize, "Winner should receive bounty + stake");
     }
 
@@ -111,7 +112,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit incorrect guess
         vm.prank(guesser);
@@ -155,7 +156,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit wrong guess
         vm.prank(guesser);
@@ -210,7 +211,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Guesser 1 submits wrong guess
         vm.prank(guesser);
@@ -247,7 +248,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         assertTrue(game.getPuzzle(puzzleId).solved, "Puzzle should be solved");
 
         // Guesser2 wins bounty + stake
-        uint256 expectedPrize = 0.1 ether + 0.01 ether;
+        // Bounty is MIN_BOUNTY (0.0001 ether), not half of msg.value
+        uint256 expectedPrize = 0.0001 ether + 0.01 ether;
         assertEq(guesser2.balance, guesser2BalanceBefore + expectedPrize, "Winner should receive bounty + stake");
     }
 
@@ -272,7 +274,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Submit wrong guess
         vm.prank(guesser);
@@ -320,7 +322,7 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Create puzzle with this commitment
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.01 ether, 65535);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
 
         // Verify stored commitment matches
         IGuessGame.Puzzle memory puzzle = game.getPuzzle(puzzleId);

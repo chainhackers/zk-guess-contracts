@@ -23,8 +23,8 @@ forge build
 # Run all tests (fast, excludes integration)
 forge test --no-match-path "test/integration/*"
 
-# Run all tests including slow FFI integration tests
-forge test --ffi
+# Run all tests including slow FFI integration tests (~10-30 min)
+forge test
 
 # Run tests with gas reporting
 forge test --gas-report
@@ -99,6 +99,14 @@ This is a ZK-based number guessing game implemented in Solidity with on-chain Gr
 - **IMPORTANT**: Cannot use `address(this).balance` for prize calculations as the contract holds funds for multiple puzzles
 - Must track each puzzle's funds separately using state variables (bounty, totalStaked, creatorReward)
 
+## Upgradeability Considerations
+
+This contract uses UUPS proxy pattern. When modifying the contract:
+- **Storage layout**: Never reorder existing state variables or change their types
+- **New fields**: Add new struct fields at the END only (e.g., `lastResponseTime` added after `lastChallengeTimestamp`)
+- **Existing puzzles**: Consider how changes affect puzzles created before the upgrade
+- **Testing**: For breaking changes, create an upgrade compatibility test with the pre-upgrade version
+
 ## Testing Approach
 
 Tests use Foundry's testing framework with the following patterns:
@@ -108,6 +116,12 @@ Tests use Foundry's testing framework with the following patterns:
 - Mock proofs for testing (actual ZK proofs generated off-chain)
 - Use `vm.prank()` for simulating different actors
 - Use `vm.expectRevert()` for testing error conditions
+
+## Writing Style
+
+- Avoid filler words like "implement", "add", "create" in issue/task titles
+- Prefer descriptive nouns: "UUPS upgradeable proxy" not "Implement UUPS upgradeable proxy"
+- Use semantic commit prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`, etc.
 
 ## Deployment Configuration
 
