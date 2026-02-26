@@ -180,6 +180,12 @@ interface IGuessGame {
 
     // ============ Functions ============
 
+    /// @notice Public minimum bounty required to create a puzzle
+    function MIN_BOUNTY() external view returns (uint256);
+
+    /// @notice Public minimum stake required to submit a guess
+    function MIN_STAKE() external view returns (uint256);
+
     /// @notice Create a new puzzle with a commitment to a secret number
     /// @param commitment Poseidon hash of (secret, salt)
     /// @param bounty Prize amount (must be >= MIN_BOUNTY)
