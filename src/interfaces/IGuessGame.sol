@@ -59,14 +59,22 @@ interface IGuessGame {
 
     /// @notice Emitted when a new puzzle is created
     event PuzzleCreated(
-        uint256 indexed puzzleId, address creator, bytes32 commitment, uint256 bounty, uint256 maxNumber
+        uint256 indexed puzzleId,
+        address creator,
+        bytes32 commitment,
+        uint256 bounty,
+        uint256 collateral,
+        uint256 stakeRequired,
+        uint256 maxNumber
     );
 
     /// @notice Emitted when a guesser submits a challenge
-    event ChallengeCreated(uint256 indexed challengeId, uint256 indexed puzzleId, address guesser, uint256 guess);
+    event ChallengeCreated(
+        uint256 indexed challengeId, uint256 indexed puzzleId, address guesser, uint256 guess, uint256 stake
+    );
 
     /// @notice Emitted when creator responds to a challenge with a ZK proof
-    event ChallengeResponded(uint256 indexed challengeId, bool correct);
+    event ChallengeResponded(uint256 indexed puzzleId, uint256 indexed challengeId, bool correct);
 
     /// @notice Emitted when a puzzle is solved by a correct guess
     event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
@@ -75,7 +83,7 @@ interface IGuessGame {
     event PuzzleCancelled(uint256 indexed puzzleId);
 
     /// @notice Emitted when a puzzle is forfeited due to creator inactivity
-    event PuzzleForfeited(uint256 indexed puzzleId);
+    event PuzzleForfeited(uint256 indexed puzzleId, uint256 pendingAtForfeit);
 
     /// @notice Emitted when collateral is slashed to treasury on forfeit
     event CollateralSlashed(uint256 indexed puzzleId, uint256 amount);

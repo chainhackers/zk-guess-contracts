@@ -945,7 +945,7 @@ contract GuessGameTest is Test {
         bool foundCollateralSlashed = false;
 
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == keccak256("PuzzleForfeited(uint256)")) {
+            if (logs[i].topics[0] == keccak256("PuzzleForfeited(uint256,uint256)")) {
                 foundPuzzleForfeited = true;
             }
             if (logs[i].topics[0] == keccak256("CollateralSlashed(uint256,uint256)")) {
@@ -1041,7 +1041,7 @@ contract GuessGameTest is Test {
         uint256 maxNumber = 100;
 
         vm.expectEmit(true, false, false, true);
-        emit IGuessGame.PuzzleCreated(0, creator, commitment, 0.0001 ether, maxNumber);
+        emit IGuessGame.PuzzleCreated(0, creator, commitment, 0.0001 ether, 0.1999 ether, stakeRequired, maxNumber);
 
         vm.prank(creator);
         game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, stakeRequired, maxNumber);
