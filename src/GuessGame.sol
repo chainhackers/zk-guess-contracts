@@ -121,7 +121,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             pendingAtForfeit: 0
         });
 
-        emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty, maxNumber);
+        emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty, collateral, stakeRequired, maxNumber);
     }
 
     /// @inheritdoc IGuessGame
@@ -150,7 +150,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             guesser: msg.sender, responded: false, guess: guess, stake: msg.value, timestamp: block.timestamp
         });
 
-        emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess);
+        emit ChallengeCreated(challengeId, puzzleId, msg.sender, guess, msg.value);
     }
 
     /// @inheritdoc IGuessGame
@@ -195,7 +195,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         guesserStakeTotal[puzzleId][challenge.guesser] -= challenge.stake;
         guesserChallengeCount[puzzleId][challenge.guesser]--;
 
-        emit ChallengeResponded(challengeId, isCorrect);
+        emit ChallengeResponded(puzzleId, challengeId, isCorrect);
 
         if (isCorrect) {
             puzzle.solved = true;
@@ -262,7 +262,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         puzzle.forfeited = true;
         puzzle.pendingAtForfeit = puzzle.pendingChallenges;
 
-        emit PuzzleForfeited(puzzleId);
+        emit PuzzleForfeited(puzzleId, puzzle.pendingChallenges);
 
         // Slash collateral to treasury (if any)
         if (puzzle.collateral > 0) {
