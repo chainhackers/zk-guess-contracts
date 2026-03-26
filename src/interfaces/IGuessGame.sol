@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 /// @title IGuessGame
 /// @notice Interface for the ZK-based number guessing game with on-chain Groth16 verification
 /// @dev Puzzle creators commit to a secret number, guessers submit challenges, creators respond with ZK proofs
+/// @custom:repository https://github.com/chainhackers/zk-guess-contracts
 interface IGuessGame {
     /// @notice Represents a puzzle created by a user
     /// @dev Puzzles transition through states: active -> solved/cancelled/forfeited
@@ -32,7 +33,8 @@ interface IGuessGame {
         uint256 challengeCount;
         /// @notice Number of challenges awaiting creator response
         uint256 pendingChallenges;
-        /// @notice Timestamp of the most recent challenge submission
+        /// @notice Timestamp of puzzle creation or most recent challenge submission
+        /// @dev Initialized to block.timestamp at creation; updated on each challenge. Used for cancel timeout.
         uint256 lastChallengeTimestamp;
         /// @notice Timestamp of the most recent creator response to any challenge
         /// @dev Used to determine forfeit eligibility - creator must respond within RESPONSE_TIMEOUT
