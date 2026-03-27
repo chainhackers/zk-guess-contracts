@@ -11,6 +11,7 @@ import "./interfaces/IGuessGame.sol";
 /// @notice ZK-based number guessing game with on-chain Groth16 proof verification
 /// @dev Implements UUPS upgradeable pattern. Puzzle creators commit to a secret number,
 ///      guessers submit challenges with stakes, creators respond with ZK proofs.
+/// @custom:repository https://github.com/chainhackers/zk-guess-contracts
 contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /// @notice External Groth16 verifier contract for ZK proof validation
     IGroth16Verifier public verifier;
@@ -116,7 +117,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             maxNumber: maxNumber,
             challengeCount: 0,
             pendingChallenges: 0,
-            lastChallengeTimestamp: 0,
+            lastChallengeTimestamp: block.timestamp,
             lastResponseTime: 0,
             pendingAtForfeit: 0
         });
@@ -225,10 +226,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (puzzle.cancelled) revert PuzzleCancelledError();
         if (puzzle.forfeited) revert PuzzleForfeitedError();
         if (puzzle.pendingChallenges > 0) revert HasPendingChallenges();
-        // Can only cancel if no challenges yet, or timeout has passed since last challenge
-        if (puzzle.lastChallengeTimestamp != 0 && block.timestamp < puzzle.lastChallengeTimestamp + CANCEL_TIMEOUT) {
-            revert CancelTooSoon();
-        }
+        if (block.timestamp < puzzle.lastChallengeTimestamp + CANCEL_TIMEOUT) revert CancelTooSoon();
 
         puzzle.cancelled = true;
 

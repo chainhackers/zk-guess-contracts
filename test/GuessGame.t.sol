@@ -63,7 +63,7 @@ contract GuessGameTest is Test {
         assertEq(puzzle.forfeited, false);
         assertEq(puzzle.challengeCount, 0);
         assertEq(puzzle.pendingChallenges, 0);
-        assertEq(puzzle.lastChallengeTimestamp, 0);
+        assertEq(puzzle.lastChallengeTimestamp, block.timestamp);
         assertEq(puzzle.lastResponseTime, 0);
         assertEq(puzzle.pendingAtForfeit, 0);
 
@@ -159,7 +159,8 @@ contract GuessGameTest is Test {
             keccak256(abi.encodePacked(uint256(42), uint256(123))), 0.0001 ether, 0.01 ether, 100
         );
 
-        // Cancel it
+        // Warp past cancel timeout and cancel
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
@@ -203,6 +204,9 @@ contract GuessGameTest is Test {
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.0001 ether, 0.01 ether, 100);
 
+        // Warp past cancel timeout
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
+
         // Check creator balance before cancelling
         uint256 creatorBalanceBefore = creator.balance;
 
@@ -244,14 +248,28 @@ contract GuessGameTest is Test {
         game.cancelPuzzle(puzzleId);
     }
 
-    function test_CancelPuzzle_NoChallenges_ImmediateCancel() public {
-        // Create puzzle with no challenges - should be able to cancel immediately
+    function test_CancelPuzzle_FreshPuzzleTooSoon() public {
+        // Create puzzle with no challenges - cannot cancel immediately
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.0001 ether, 0.01 ether, 100);
 
+        // Immediate cancel should fail
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.CancelTooSoon.selector);
+        game.cancelPuzzle(puzzleId);
+    }
+
+    function test_CancelPuzzle_NoChallenges_AfterTimeout() public {
+        // Create puzzle with no challenges
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.0001 ether, 0.01 ether, 100);
+
+        // Warp past cancel timeout
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
+
         uint256 creatorBalanceBefore = creator.balance;
 
-        // Can cancel immediately when no challenges have been submitted
+        // Can cancel after timeout
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
@@ -598,6 +616,9 @@ contract GuessGameTest is Test {
 
         assertEq(creator.balance, creatorBalanceBefore - 0.2 ether);
 
+        // Warp past cancel timeout
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
+
         // Cancel puzzle
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
@@ -702,6 +723,7 @@ contract GuessGameTest is Test {
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(bytes32(uint256(1)), 0.0001 ether, 0.01 ether, 100);
 
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
@@ -779,7 +801,10 @@ contract GuessGameTest is Test {
 
         assertEq(creator.balance, creatorBefore - 0.0001 ether);
 
-        // Cancel immediately (no challenges)
+        // Warp past cancel timeout
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
+
+        // Cancel (no challenges)
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 

@@ -210,7 +210,8 @@ contract UpgradeFromCurrentTest is Test {
 
         uint256 creatorBalanceBefore = creator.balance;
 
-        // Cancel via new implementation (no challenges, no timeout needed)
+        // Cancel via new implementation (warp past timeout — old puzzles have lastChallengeTimestamp=0)
+        vm.warp(block.timestamp + newGame.CANCEL_TIMEOUT() + 1);
         vm.prank(creator);
         newGame.cancelPuzzle(puzzleId);
 

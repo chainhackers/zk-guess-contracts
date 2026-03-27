@@ -1634,7 +1634,8 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(creator);
         uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(COMMITMENT_42_123, 0.0001 ether, 0.01 ether, 100);
 
-        // Cancel immediately (no challenges)
+        // Warp past cancel timeout and cancel
+        vm.warp(block.timestamp + game.CANCEL_TIMEOUT() + 1);
         vm.prank(creator);
         game.cancelPuzzle(puzzleId);
 
