@@ -121,6 +121,107 @@ contract SettleAllTest is Test {
         assertEq(creator.balance, balanceBefore + 0.5 ether);
     }
 
+    // ============ zero-dust guarantee tests (PR #35 discussion) ============
+    //
+    // These tests prove that settlement drains the contract to exactly 0 across the two
+    // paths distinguished in the review discussion:
+    //
+    // 1. Mid-claim: some claimants call claimFromForfeited first (updates challengesClaimed),
+    //    then settleAll picks up the rest. Partial telescoping + dust sweep.
+    // 2. Pure settlement: nobody claims first; settleAll computes truncated shares against
+    //    a=0 for all, dust sweep sends residual to the last recipient.
+
+    function _forfeitedPuzzleWith3Guessers(uint256 bounty, uint256 stake)
+        internal
+        returns (uint256 puzzleId, address g1, address g2, address g3)
+    {
+        g1 = makeAddr("g1");
+        g2 = makeAddr("g2");
+        g3 = makeAddr("g3");
+        vm.deal(g1, 1 ether);
+        vm.deal(g2, 1 ether);
+        vm.deal(g3, 1 ether);
+
+        vm.prank(creator);
+        puzzleId = game.createPuzzle{value: bounty}(commitment, bounty, stake, 100);
+
+        vm.prank(g1);
+        game.submitGuess{value: stake}(puzzleId, 1);
+        vm.prank(g2);
+        game.submitGuess{value: stake}(puzzleId, 2);
+        vm.prank(g3);
+        game.submitGuess{value: stake}(puzzleId, 3);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+    }
+
+    function test_settleAll_zeroDustAfterMidFlowClaim() public {
+        // bounty = 10^14 wei, not divisible by 3 → dust would accumulate without sweep
+        uint256 bounty = 0.0001 ether;
+        uint256 stake = 0.01 ether;
+
+        (uint256 puzzleId, address g1, address g2, address g3) = _forfeitedPuzzleWith3Guessers(bounty, stake);
+
+        // g1 claims first — updates puzzle.challengesClaimed to 1
+        vm.prank(g1);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(g1);
+        game.withdraw();
+
+        // Owner settles the remaining two in one call.
+        // Both g2 and g3 compute _computeOwed against the same a=1 snapshot
+        // (settleAll does not re-read/update challengesClaimed mid-loop).
+        address[] memory recipients = new address[](2);
+        recipients[0] = g2;
+        recipients[1] = g3;
+        vm.prank(owner);
+        game.settleAll(recipients, "mid-claim");
+
+        // Contract fully drained — dust sweep (≤10000 wei) absorbs any residual.
+        assertEq(address(proxy).balance, 0);
+        assertEq(game.settled(), true);
+
+        // Sum of bounty shares received == bounty (zero dust stranded).
+        // Each guesser started at 1 ether, paid stake, then got back stake + bountyShare.
+        // Net balance - 1 ether == their bounty share.
+        uint256 g1Share = g1.balance - 1 ether;
+        uint256 g2Share = g2.balance - 1 ether;
+        uint256 g3Share = g3.balance - 1 ether;
+        assertEq(g1Share + g2Share + g3Share, bounty);
+    }
+
+    function test_settleAll_zeroDustWithPureSettlement() public {
+        // Same setup; nobody calls claimFromForfeited.
+        uint256 bounty = 0.0001 ether;
+        uint256 stake = 0.01 ether;
+
+        (uint256 puzzleId, address g1, address g2, address g3) = _forfeitedPuzzleWith3Guessers(bounty, stake);
+        puzzleId; // silence unused
+
+        // All three go through settleAll. Each recipient's bounty share is computed
+        // against a=0 (no prior claims), so each gets floor(bounty/3). Sum is bounty-1,
+        // and the last recipient (g3) absorbs the 1 wei residual via the dust sweep.
+        address[] memory recipients = new address[](3);
+        recipients[0] = g1;
+        recipients[1] = g2;
+        recipients[2] = g3;
+        vm.prank(owner);
+        game.settleAll(recipients, "pure");
+
+        assertEq(address(proxy).balance, 0);
+        assertEq(game.settled(), true);
+
+        uint256 floor3 = bounty / 3;
+        uint256 g1Share = g1.balance - 1 ether;
+        uint256 g2Share = g2.balance - 1 ether;
+        uint256 g3Share = g3.balance - 1 ether;
+        assertEq(g1Share, floor3);
+        assertEq(g2Share, floor3);
+        assertEq(g3Share, bounty - 2 * floor3); // gets remainder via dust sweep
+        assertEq(g1Share + g2Share + g3Share, bounty);
+    }
+
     // ============ settleAll tests ============
 
     function test_settleAll_distributesAllFunds() public {
