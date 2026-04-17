@@ -22,6 +22,10 @@ settle-mainnet.sh
 discover-unsettled.sh
 .settle-cache/
 
+# One-time migration artifacts and scratch scripts (not part of main project)
+archive/
+node_modules/
+
 # Remix compiler artifacts
 **/artifacts/
 **/artifacts/**
