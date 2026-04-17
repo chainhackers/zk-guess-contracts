@@ -1107,9 +1107,11 @@ contract GuessGameWithProofsTest is Test {
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         game.forfeitPuzzle(puzzleId, 0);
 
-        // Calculate expected shares
+        // Calculate expected shares (cumulative division: last claimant gets remainder)
         uint256 bounty = 0.0001 ether;
-        uint256 bountyShare = bounty / 3; // 33333333333333333 wei
+        uint256 share1 = bounty / 3; // floor(bounty*1/3)
+        uint256 share2 = (bounty * 2) / 3 - share1; // floor(bounty*2/3) - floor(bounty*1/3)
+        uint256 share3 = bounty - (bounty * 2) / 3; // bounty - floor(bounty*2/3)
 
         // All guessers claim (single call each)
         vm.prank(guesser);
@@ -1122,9 +1124,12 @@ contract GuessGameWithProofsTest is Test {
         game.claimFromForfeited(puzzleId);
 
         // Verify balances credited
-        assertEq(game.balances(guesser), 0.01 ether + bountyShare);
-        assertEq(game.balances(guesser2), 0.01 ether + bountyShare);
-        assertEq(game.balances(guesser3), 0.01 ether + bountyShare);
+        assertEq(game.balances(guesser), 0.01 ether + share1);
+        assertEq(game.balances(guesser2), 0.01 ether + share2);
+        assertEq(game.balances(guesser3), 0.01 ether + share3);
+
+        // Total bounty distributed exactly
+        assertEq(share1 + share2 + share3, bounty);
 
         // Withdraw all
         vm.prank(guesser);
@@ -1135,9 +1140,9 @@ contract GuessGameWithProofsTest is Test {
         game.withdraw();
 
         // Each guesser gained their bounty share
-        assertEq(guesser.balance, guesser1Start + bountyShare);
-        assertEq(guesser2.balance, guesser2Start + bountyShare);
-        assertEq(guesser3.balance, guesser3Start + bountyShare);
+        assertEq(guesser.balance, guesser1Start + share1);
+        assertEq(guesser2.balance, guesser2Start + share2);
+        assertEq(guesser3.balance, guesser3Start + share3);
     }
 
     // ============ Protocol Issue Tests ============
@@ -1250,12 +1255,16 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser2);
         game.claimFromForfeited(puzzleId);
 
-        // Guesser1: stake (0.03) + bounty share (0.0001 * 2/3 = 0.000066..)
-        // With integer division: 0.0001 * 2 / 3 = 66666... wei
-        assertEq(game.balances(guesser), 0.03 ether + 66666666666666);
+        // Cumulative division: guesser1 claims first (c=2), guesser2 claims second (c=1)
+        // guesser1: floor(bounty*2/3) = 66666666666666
+        // guesser2: bounty - floor(bounty*2/3) = 33333333333334 (gets remainder)
+        uint256 bounty = 0.0001 ether;
+        uint256 share1 = (bounty * 2) / 3;
+        uint256 share2 = bounty - share1;
 
-        // Guesser2: stake (0.01) + bounty share (0.0001 * 1/3 = 0.000033..)
-        assertEq(game.balances(guesser2), 0.01 ether + 33333333333333);
+        assertEq(game.balances(guesser), 0.03 ether + share1);
+        assertEq(game.balances(guesser2), 0.01 ether + share2);
+        assertEq(share1 + share2, bounty);
 
         // Withdraw
         vm.prank(guesser);
@@ -1263,9 +1272,8 @@ contract GuessGameWithProofsTest is Test {
         vm.prank(guesser2);
         game.withdraw();
 
-        // Verify final balances (net gain from bounty share)
-        assertEq(guesser.balance, guesser1Start + 66666666666666); // gained bounty share
-        assertEq(guesser2.balance, guesser2Start + 33333333333333); // gained bounty share
+        assertEq(guesser.balance, guesser1Start + share1);
+        assertEq(guesser2.balance, guesser2Start + share2);
     }
 
     /**

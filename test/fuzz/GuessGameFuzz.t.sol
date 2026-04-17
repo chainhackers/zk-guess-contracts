@@ -422,18 +422,19 @@ contract GuessGameFuzz is Test {
             claimedAmounts[i] = game.balances(guessers[i]);
         }
 
-        // All amounts should be equal (stake + MIN_BOUNTY/numGuessers)
-        uint256 expectedBountyShare = MIN_BOUNTY / numGuessers;
-        uint256 expectedTotal = MIN_STAKE + expectedBountyShare;
-
+        // With cumulative division, total bounty distributed exactly equals MIN_BOUNTY (zero dust).
+        // Individual shares may differ by ±1 wei due to remainder assignment.
+        uint256 totalBountyDistributed;
         for (uint256 i = 0; i < numGuessers; i++) {
-            assertEq(claimedAmounts[i], expectedTotal, "Unequal distribution");
+            uint256 bountyShare = claimedAmounts[i] - MIN_STAKE;
+            totalBountyDistributed += bountyShare;
+            // Each share within 1 wei of proportional
+            uint256 proportional = MIN_BOUNTY / numGuessers;
+            assertLe(bountyShare, proportional + 1, "Share too high");
+            assertGe(bountyShare, proportional, "Share too low");
         }
 
-        // Total distributed should be close to MIN_BOUNTY (within numGuessers-1 wei dust)
-        uint256 totalDistributed = expectedBountyShare * numGuessers;
-        uint256 dust = MIN_BOUNTY - totalDistributed;
-        assertLt(dust, numGuessers, "Too much dust");
+        assertEq(totalBountyDistributed, MIN_BOUNTY, "Bounty not fully distributed");
     }
 
     /**

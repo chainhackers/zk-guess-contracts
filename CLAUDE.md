@@ -91,7 +91,7 @@ This is a ZK-based number guessing game implemented in Solidity with on-chain Gr
 
 ### Key Implementation Details
 
-- Minimum bounty: 0.001 ether
+- Minimum bounty: 0.0001 ether (MIN_BOUNTY constant)
 - Creator never reveals the actual secret number
 - ZK proofs verify both knowledge of secret and correctness of guess
 - Bounty grows by configurable percentage from failed guesses
@@ -116,6 +116,7 @@ Tests use Foundry's testing framework with the following patterns:
 - Mock proofs for testing (actual ZK proofs generated off-chain)
 - Use `vm.prank()` for simulating different actors
 - Use `vm.expectRevert()` for testing error conditions
+- Fork tests: prefer `forge test --fork-url <RPC>` over Anvil forks — Foundry caches RPC storage reads across iterations, massively faster for view-heavy calls
 
 ## Writing Style
 
@@ -130,3 +131,9 @@ Tests use Foundry's testing framework with the following patterns:
 - Environment variables loaded from `.env` file
 - Supports Base Sepolia (testnet) and Base mainnet
 - Contract verification integrated into deployment scripts
+
+## Bash scripting with `cast`
+
+- `cast call` prints `100000000000000 [1e14]` — strip the `[...]` suffix before bash arithmetic: pipe through `sed 's/ \[.*//g'`
+- Base per-tx gas cap is ~25M (Alchemy) to ~30M (public RPC), far below the 400M block limit — large recipient arrays must be batched
+- Forge simulator (`forge script`, `forge test` without `--fork-url`) can't handle EIP-7702 delegated EOAs (`code` starts with `0xef0100`), reverts with `NotActivated` — use `cast send` directly to broadcast past forge simulation
