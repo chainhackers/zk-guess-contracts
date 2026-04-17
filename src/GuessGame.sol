@@ -86,6 +86,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     function initialize(address _verifier, address _treasury, address _owner) public initializer {
         if (_owner == address(0)) revert InvalidOwnerAddress();
         __Ownable_init(_owner);
+        __Pausable_init();
 
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
@@ -99,9 +100,10 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @dev Only owner can authorize upgrades. Implementation intentionally empty.
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /// @dev Reverts if the contract has been permanently settled
+    /// @dev Reverts if the contract has been permanently settled, or if msg.sender's funds
+    ///      have already been distributed via settle()/settleAll() — prevents double payment.
     modifier notSettled() {
-        if (settled) revert ContractSettled();
+        if (settled || settledPaid[msg.sender]) revert ContractSettled();
         _;
     }
 

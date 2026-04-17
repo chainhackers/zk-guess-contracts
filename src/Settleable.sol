@@ -31,7 +31,7 @@ abstract contract Settleable is ISettleable, OwnableUpgradeable {
             }
         }
 
-        emit Settled(msg.sender, totalDistributed, recipients.length);
+        emit SettlementBatch(msg.sender, totalDistributed, recipients.length);
     }
 
     /// @inheritdoc ISettleable
@@ -63,7 +63,7 @@ abstract contract Settleable is ISettleable, OwnableUpgradeable {
             if (!ok) revert SettleTransferFailed();
         }
 
-        emit Settled(msg.sender, totalDistributed, recipients.length);
+        emit Settled(msg.sender, totalDistributed, recipients.length, reason);
         if (address(this).balance != 0) revert BalanceMismatch();
         _transferOwnership(address(0));
     }

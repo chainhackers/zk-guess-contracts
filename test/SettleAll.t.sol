@@ -165,7 +165,7 @@ contract SettleAllTest is Test {
         recipients[0] = creator;
 
         vm.expectEmit(true, false, false, true);
-        emit ISettleable.Settled(owner, 0.5 ether, 1);
+        emit ISettleable.Settled(owner, 0.5 ether, 1, "test");
 
         vm.prank(owner);
         game.settleAll(recipients, "test");
