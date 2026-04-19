@@ -4,29 +4,28 @@ pragma solidity ^0.8.30;
 import "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import "../src/Rewards.sol";
 import "../src/generated/GuessVerifier.sol";
 
 contract DeployScript is Script {
+    /// @notice Deploys Verifier + Rewards + GuessGame (proxy); Rewards is GuessGame's treasury.
+    /// @dev Forfeit collateral flows into Rewards; owner publishes merkle roots to distribute.
     function run() external {
-        // Treasury address from environment or use deployer as fallback
-        address treasury = vm.envOr("TREASURY_ADDRESS", msg.sender);
-
-        // When using --account, forge handles the key
         vm.startBroadcast();
 
-        // Deploy verifier first
         Groth16Verifier verifier = new Groth16Verifier();
         console.log("GuessVerifier deployed at:", address(verifier));
 
-        // Deploy implementation
+        Rewards rewards = new Rewards(msg.sender);
+        console.log("Rewards deployed at:", address(rewards));
+
         GuessGame impl = new GuessGame();
         console.log("GuessGame implementation deployed at:", address(impl));
 
-        // Deploy proxy with initialize call
-        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, msg.sender));
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), address(rewards), msg.sender));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         console.log("GuessGame proxy deployed at:", address(proxy));
-        console.log("Treasury address:", treasury);
+        console.log("Treasury (Rewards) address:", address(rewards));
 
         vm.stopBroadcast();
     }
