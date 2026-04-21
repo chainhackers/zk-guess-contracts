@@ -58,9 +58,14 @@ forge test --match-path test/GuessGame.t.sol
 
 ## Deployed Contracts (Base Mainnet)
 
-- **GuessGame (Proxy)**: [`0xfa37cdcff862114c88c8e19b10b362d611a2c45f`](https://basescan.org/address/0xfa37cdcff862114c88c8e19b10b362d611a2c45f)
-- Implementation: [`0x1Eb4f9E52da979a57E1B3187CE5F37C57A264D9C`](https://basescan.org/address/0x1Eb4f9E52da979a57E1B3187CE5F37C57A264D9C)
-- Verifier: [`0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34`](https://basescan.org/address/0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34)
+- **GuessGame (Proxy)**: [`0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590`](https://basescan.org/address/0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590)
+- Implementation: [`0x4a2d3b37b7a4b99ee523b3c47993876501d2d850`](https://basescan.org/address/0x4a2d3b37b7a4b99ee523b3c47993876501d2d850)
+- Verifier: [`0xface0e73719e78e3bb020001fd10b62af9b3b6b8`](https://basescan.org/address/0xface0e73719e78e3bb020001fd10b62af9b3b6b8)
+- Rewards: [`0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c`](https://basescan.org/address/0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c) — merkle-distributed rewards pool funded by forfeit collateral
+
+### Previous deployment (permanently settled)
+
+The previous proxy at `0xfa37cdcff862114c88c8e19b10b362d611a2c45f` was settled and renounced on 2026-04-16 (tx [`0xa35864ad...`](https://basescan.org/tx/0xa35864ad1d656a355bc5199b4aad2699f1689d82c4ce0333fa5e84c507eb61b1)) — all user funds were distributed and the contract is permanently sealed. Do not interact with it.
 
 ## Architecture
 
