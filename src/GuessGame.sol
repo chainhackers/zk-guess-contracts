@@ -61,8 +61,14 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @notice Time allowed for creator to respond before forfeit becomes possible
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
+    /// @notice Tracks total bounty amount claimed per puzzle (for forfeit distribution)
+    mapping(uint256 => uint256) public bountyClaimedTotal;
+
+    /// @notice Tracks total number of claimants who have claimed from a forfeited puzzle
+    mapping(uint256 => uint256) public forfeitClaimantCount;
+
     /// @dev Reserved storage gap for future upgrades (UUPS pattern)
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     /// @notice Disables initializers to prevent implementation contract from being initialized
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -283,9 +289,23 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         // Mark as claimed
         guesserClaimed[puzzleId][msg.sender] = true;
+        forfeitClaimantCount[puzzleId]++;
 
         // Calculate payout: stake + proportional share of bounty
-        uint256 bountyShare = (puzzle.bounty * myChallenges) / puzzle.pendingAtForfeit;
+        // If this is the last claimant, give them the remaining bounty to prevent rounding dust
+        uint256 bountyShare;
+        if (forfeitClaimantCount[puzzleId] == puzzle.pendingAtForfeit) {
+            // Error safety: if somehow claimed more than total bounty, fall back to 0
+            if (puzzle.bounty > bountyClaimedTotal[puzzleId]) {
+                bountyShare = puzzle.bounty - bountyClaimedTotal[puzzleId];
+            } else {
+                bountyShare = 0;
+            }
+        } else {
+            bountyShare = (puzzle.bounty * myChallenges) / puzzle.pendingAtForfeit;
+        }
+
+        bountyClaimedTotal[puzzleId] += bountyShare;
         uint256 totalPayout = myStake + bountyShare;
 
         // Credit to internal balance
