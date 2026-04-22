@@ -29,17 +29,25 @@ npm install
 
 ## Per-epoch loop
 
-### 1. Prepare recipients CSV
+### 1. Compute recipients CSV from indexer
 
-Two columns, no quoting, one recipient per line. Header optional. Amounts in wei (decimal integers).
+The rules engine queries the production indexer for the 7-day window and applies the v1 eligibility rules (spec: `docs/superpowers/specs/2026-04-18-forfeit-rewards-merkle-distribution-design.md:176`).
+
+```bash
+source .env  # exports BASE_RPC_URL
+bun run scripts/rewards/compute-epoch.ts --epoch 1
+```
+
+Default window ends at last Monday 00:00 UTC (strict weekly cadence). Override with `--window-end <ISO>` for catch-up or historical epochs. The script writes `/tmp/epoch-<N>.csv` and logs per-category breakdown to stderr. It exits non-zero if the contract balance is `0` or no category has eligible recipients — in that case, skip this epoch, no publish needed.
+
+Optional overrides: `--rewards-addr`, `--rpc-url`, `--indexer-url`, `--out <path>`, `--dry-run` (stdout).
+
+For hand-crafted CSVs (e.g., one-off test payouts), skip this step and write the CSV directly:
 
 ```csv
 address,amount_wei
 0x4c7ae65565a8df70cbab1b8a504c56e39da59b7a,100000000000000
-0x95c5...da0d,100000000000000
 ```
-
-Keep the CSV out of git history (the builder copies it into the archive automatically). One way: edit `/tmp/epoch-<N>.csv`.
 
 ### 2. Build the epoch artifacts
 
@@ -62,9 +70,9 @@ The builder refuses to overwrite an existing `<out>/<N>/`. Delete it manually if
 Sum of payouts must be ≤ contract balance (the contract auto-funds from forfeit collateral but seed it manually for the first epoch):
 
 ```bash
-source .env  # exports BASE_MAINNET_RPC, etc.
+source .env  # exports BASE_RPC_URL, etc.
 TOTAL=$(jq -r .totalWei ../zk-guess-rewards/1/manifest.json)
-BAL=$(cast balance 0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c --rpc-url $BASE_MAINNET_RPC | sed 's/ \[.*//g')
+BAL=$(cast balance 0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c --rpc-url $BASE_RPC_URL | sed 's/ \[.*//g')
 echo "needed=$TOTAL  have=$BAL"
 ```
 
@@ -72,7 +80,7 @@ If short:
 
 ```bash
 DIFF=$(echo "$TOTAL - $BAL" | bc)
-cast send 0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c --value $DIFF --account deployer --rpc-url $BASE_MAINNET_RPC
+cast send 0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c --value $DIFF --account deployer --rpc-url $BASE_RPC_URL
 ```
 
 ### 4. Publish the root on-chain
@@ -81,7 +89,7 @@ cast send 0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c --value $DIFF --account dep
 ROOT=$(cat ../zk-guess-rewards/1/root.txt) \
 REWARDS_ADDR=0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c \
 forge script script/rewards/PublishRoot.s.sol \
-  --rpc-url $BASE_MAINNET_RPC \
+  --rpc-url $BASE_RPC_URL \
   --account deployer \
   --broadcast
 ```
@@ -122,6 +130,8 @@ Open <https://zk-guess.chainhackers.xyz/rewards> with the recipient wallet conne
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
+| `compute-epoch.ts` errors `pool is zero` | Rewards contract balance is `0` | Seed the contract via `cast send --value ... --account deployer`, or skip the epoch |
+| `compute-epoch.ts` errors `no eligible recipients across all categories` | Window had no qualifying activity | Skip the epoch; the pool rolls forward. Retry next Monday. |
 | Builder errors `--out … does not have chainhackers/zk-guess-rewards as a remote` | Pointed `--out` at the wrong dir | Pass the correct path or omit (defaults to `../zk-guess-rewards`) |
 | Builder errors `epoch directory already exists` | Re-running on the same epoch number | `rm -rf ../zk-guess-rewards/<N>/`, then re-run |
 | `publishRoot` reverts with `OwnableUnauthorizedAccount` | Deployer keystore doesn't match the contract owner | Use the right `--account` |
