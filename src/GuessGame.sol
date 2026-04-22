@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "./Settleable.sol";
 import "./interfaces/IGroth16Verifier.sol";
 import "./interfaces/IGuessGame.sol";
 
@@ -12,7 +14,7 @@ import "./interfaces/IGuessGame.sol";
 /// @dev Implements UUPS upgradeable pattern. Puzzle creators commit to a secret number,
 ///      guessers submit challenges with stakes, creators respond with ZK proofs.
 /// @custom:repository https://github.com/chainhackers/zk-guess-contracts
-contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgradeable {
+contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable, Settleable {
     /// @notice External Groth16 verifier contract for ZK proof validation
     IGroth16Verifier public verifier;
 
@@ -49,6 +51,12 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @dev Credits accumulate from forfeit claims and solved puzzle stake claims
     mapping(address => uint256) public balances;
 
+    /// @inheritdoc ISettleable
+    bool public settled;
+
+    /// @notice Whether an address has been paid during settlement (for settle() idempotency)
+    mapping(address => bool) public settledPaid;
+
     /// @notice Minimum ETH required as bounty when creating a puzzle
     uint256 public constant MIN_BOUNTY = 0.0001 ether;
 
@@ -78,6 +86,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     function initialize(address _verifier, address _treasury, address _owner) public initializer {
         if (_owner == address(0)) revert InvalidOwnerAddress();
         __Ownable_init(_owner);
+        __Pausable_init();
 
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
@@ -91,10 +100,25 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @dev Only owner can authorize upgrades. Implementation intentionally empty.
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /// @dev Reverts if the contract has been permanently settled, or if msg.sender's funds
+    ///      have already been distributed via settle()/settleAll() — prevents double payment.
+    modifier notSettled() {
+        if (settled || settledPaid[msg.sender]) revert ContractSettled();
+        _;
+    }
+
+    /// @notice Permanently pause the contract — no new puzzles or guesses allowed
+    /// @dev Only callable by owner. No unpause — this is a one-way seal.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
     /// @inheritdoc IGuessGame
     function createPuzzle(bytes32 commitment, uint256 bounty, uint256 stakeRequired, uint256 maxNumber)
         external
         payable
+        whenNotPaused
+        notSettled
         returns (uint256 puzzleId)
     {
         if (bounty < MIN_BOUNTY) revert InsufficientBounty();
@@ -119,14 +143,21 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             pendingChallenges: 0,
             lastChallengeTimestamp: block.timestamp,
             lastResponseTime: 0,
-            pendingAtForfeit: 0
+            pendingAtForfeit: 0,
+            challengesClaimed: 0
         });
 
         emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty, collateral, stakeRequired, maxNumber);
     }
 
     /// @inheritdoc IGuessGame
-    function submitGuess(uint256 puzzleId, uint256 guess) external payable returns (uint256 challengeId) {
+    function submitGuess(uint256 puzzleId, uint256 guess)
+        external
+        payable
+        whenNotPaused
+        notSettled
+        returns (uint256 challengeId)
+    {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
@@ -162,7 +193,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
         uint256[4] calldata _pubSignals
-    ) external {
+    ) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
@@ -218,7 +249,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     /// @inheritdoc IGuessGame
-    function cancelPuzzle(uint256 puzzleId) external {
+    function cancelPuzzle(uint256 puzzleId) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (msg.sender != puzzle.creator) revert OnlyPuzzleCreator();
@@ -238,7 +269,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     /// @inheritdoc IGuessGame
-    function forfeitPuzzle(uint256 puzzleId, uint256 timedOutChallengeId) external {
+    function forfeitPuzzle(uint256 puzzleId, uint256 timedOutChallengeId) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (puzzle.solved) revert PuzzleAlreadySolved();
@@ -260,7 +291,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         puzzle.forfeited = true;
         puzzle.pendingAtForfeit = puzzle.pendingChallenges;
 
-        emit PuzzleForfeited(puzzleId, puzzle.pendingChallenges);
+        emit PuzzleForfeited(puzzleId, puzzle.pendingAtForfeit);
 
         // Slash collateral to treasury (if any)
         if (puzzle.collateral > 0) {
@@ -271,7 +302,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     /// @inheritdoc IGuessGame
-    function claimFromForfeited(uint256 puzzleId) external {
+    function claimFromForfeited(uint256 puzzleId) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (!puzzle.forfeited) revert PuzzleNotForfeited();
@@ -284,8 +315,14 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Mark as claimed
         guesserClaimed[puzzleId][msg.sender] = true;
 
-        // Calculate payout: stake + proportional share of bounty
-        uint256 bountyShare = (puzzle.bounty * myChallenges) / puzzle.pendingAtForfeit;
+        // Cumulative difference, not (bounty * myChallenges) / pendingAtForfeit, because the
+        // two integer divisions telescope to exactly bounty across all claims, with the last
+        // claimant absorbing the remainder. Do not simplify to the single-division form.
+        uint256 a = puzzle.challengesClaimed;
+        uint256 b = a + myChallenges;
+        puzzle.challengesClaimed = b;
+        uint256 bountyShare =
+            (puzzle.bounty * b) / puzzle.pendingAtForfeit - (puzzle.bounty * a) / puzzle.pendingAtForfeit;
         uint256 totalPayout = myStake + bountyShare;
 
         // Credit to internal balance
@@ -295,7 +332,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     /// @inheritdoc IGuessGame
-    function claimStakeFromSolved(uint256 puzzleId) external {
+    function claimStakeFromSolved(uint256 puzzleId) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (!puzzle.solved) revert PuzzleNotSolved();
@@ -314,7 +351,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     /// @inheritdoc IGuessGame
-    function withdraw() external {
+    function withdraw() external notSettled {
         uint256 amount = balances[msg.sender];
         if (amount == 0) revert NothingToWithdraw();
 
@@ -324,6 +361,52 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         (bool success,) = msg.sender.call{value: amount}("");
         if (!success) revert TransferFailed();
+    }
+
+    function _isSettled() internal view override returns (bool) {
+        return settled;
+    }
+
+    function _setSettled() internal override {
+        settled = true;
+    }
+
+    function _isPaid(address addr) internal view override returns (bool) {
+        return settledPaid[addr];
+    }
+
+    function _markPaid(address addr) internal override {
+        settledPaid[addr] = true;
+    }
+
+    function _computeOwed(address addr) internal view override returns (uint256 owed) {
+        owed = balances[addr];
+
+        for (uint256 pid; pid < puzzleCount; pid++) {
+            Puzzle storage p = puzzles[pid];
+
+            // Unclaimed forfeit share
+            if (p.forfeited && !guesserClaimed[pid][addr]) {
+                uint256 myChallenges = guesserChallengeCount[pid][addr];
+                if (myChallenges > 0) {
+                    uint256 a = p.challengesClaimed;
+                    uint256 bountyShare =
+                        (p.bounty * (a + myChallenges)) / p.pendingAtForfeit - (p.bounty * a) / p.pendingAtForfeit;
+                    owed += guesserStakeTotal[pid][addr] + bountyShare;
+                }
+            }
+
+            // Unclaimed solved-puzzle stake (non-winners)
+            if (p.solved && !guesserClaimed[pid][addr]) {
+                uint256 myStake = guesserStakeTotal[pid][addr];
+                if (myStake > 0) owed += myStake;
+            }
+
+            // Active puzzle creator funds
+            if (!p.solved && !p.cancelled && !p.forfeited && p.creator == addr) {
+                owed += p.bounty + p.collateral;
+            }
+        }
     }
 
     /// @inheritdoc IGuessGame

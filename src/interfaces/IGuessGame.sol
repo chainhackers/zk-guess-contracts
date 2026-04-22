@@ -41,6 +41,8 @@ interface IGuessGame {
         uint256 lastResponseTime;
         /// @notice Snapshot of pending challenges at forfeit time (for claim distribution)
         uint256 pendingAtForfeit;
+        /// @notice Cumulative challenges claimed from forfeited puzzle (for dust-free bounty division)
+        uint256 challengesClaimed;
     }
 
     /// @notice Represents a guess challenge submitted by a player

@@ -543,6 +543,105 @@ contract GuessGameTest is Test {
         game.claimFromForfeited(puzzleId);
     }
 
+    function test_ClaimFromForfeited_NoDustWithUnevenChallenges() public {
+        // 7 pending challenges across 3 claimants (3,3,1)
+        uint256 bounty = 0.0001 ether;
+        uint256 stake = 0.001 ether;
+
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: bounty}(bytes32(uint256(1)), bounty, stake, 100);
+
+        address g1 = makeAddr("g1");
+        address g2 = makeAddr("g2");
+        address g3 = makeAddr("g3");
+        vm.deal(g1, 1 ether);
+        vm.deal(g2, 1 ether);
+        vm.deal(g3, 1 ether);
+
+        vm.prank(g1);
+        game.submitGuess{value: stake}(puzzleId, 1);
+        vm.prank(g1);
+        game.submitGuess{value: stake}(puzzleId, 2);
+        vm.prank(g1);
+        game.submitGuess{value: stake}(puzzleId, 3);
+        vm.prank(g2);
+        game.submitGuess{value: stake}(puzzleId, 4);
+        vm.prank(g2);
+        game.submitGuess{value: stake}(puzzleId, 5);
+        vm.prank(g2);
+        game.submitGuess{value: stake}(puzzleId, 6);
+        vm.prank(g3);
+        game.submitGuess{value: stake}(puzzleId, 7);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(g1);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(g2);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(g3);
+        game.claimFromForfeited(puzzleId);
+
+        // Cumulative: g1=floor(b*3/7), g2=floor(b*6/7)-floor(b*3/7), g3=b-floor(b*6/7). Sum=b.
+        uint256 b1 = game.balances(g1) - 3 * stake;
+        uint256 b2 = game.balances(g2) - 3 * stake;
+        uint256 b3 = game.balances(g3) - 1 * stake;
+        assertEq(b1 + b2 + b3, bounty);
+
+        vm.prank(g1);
+        game.withdraw();
+        vm.prank(g2);
+        game.withdraw();
+        vm.prank(g3);
+        game.withdraw();
+
+        assertEq(address(game).balance, 0);
+    }
+
+    function test_ClaimFromForfeited_LastClaimantGetsDust() public {
+        // bounty not divisible by 3. Last claimant absorbs remainder.
+        uint256 bounty = 0.0001 ether;
+        uint256 stake = 0.01 ether;
+
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: bounty}(bytes32(uint256(1)), bounty, stake, 100);
+
+        address g1 = makeAddr("g1");
+        address g2 = makeAddr("g2");
+        address g3 = makeAddr("g3");
+        vm.deal(g1, 1 ether);
+        vm.deal(g2, 1 ether);
+        vm.deal(g3, 1 ether);
+
+        vm.prank(g1);
+        game.submitGuess{value: stake}(puzzleId, 1);
+        vm.prank(g2);
+        game.submitGuess{value: stake}(puzzleId, 2);
+        vm.prank(g3);
+        game.submitGuess{value: stake}(puzzleId, 3);
+
+        vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
+        game.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(g1);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(g2);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(g3);
+        game.claimFromForfeited(puzzleId);
+
+        uint256 share1 = game.balances(g1) - stake;
+        uint256 share2 = game.balances(g2) - stake;
+        uint256 share3 = game.balances(g3) - stake;
+
+        // First two get floor(bounty/3), last gets bounty - 2*floor(bounty/3)
+        assertEq(share1, bounty / 3);
+        assertEq(share2, bounty / 3);
+        assertEq(share3, bounty - 2 * (bounty / 3));
+        assertGt(share3, share1);
+    }
+
     // ============ Collateral Tests ============
 
     function test_CreatePuzzleWithCollateral() public {

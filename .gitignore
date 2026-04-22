@@ -7,8 +7,9 @@ out/
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
-# Docs
-docs/
+# Docs (forge doc output) — allow hand-written specs under docs/superpowers/
+docs/*
+!docs/superpowers/
 
 # Dotenv file
 .env
@@ -16,6 +17,15 @@ docs/
 
 # Secrets
 .secrets
+
+# Settlement scripts and cache (contain addresses/amounts)
+settle-mainnet.sh
+discover-unsettled.sh
+.settle-cache/
+
+# One-time migration artifacts and scratch scripts (not part of main project)
+archive/
+node_modules/
 
 # Remix compiler artifacts
 **/artifacts/
