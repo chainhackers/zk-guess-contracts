@@ -86,7 +86,7 @@ forge script script/rewards/PublishRoot.s.sol \
   --broadcast
 ```
 
-Run this with the account that owns `Rewards`; ownership is enforced on-chain by `publishRoot`'s `onlyOwner`, so a wrong `--account` reverts the tx. Optionally pass `EXPECTED_EPOCH=<N>` to guard against races — the script asserts `prevEpoch + 1 == EXPECTED_EPOCH` before broadcasting. Logs the assigned epoch number.
+Run this with the account that owns `Rewards`; ownership is enforced on-chain by `publishRoot`'s `onlyOwner`, so a wrong `--account` reverts the tx. Optionally pass `EXPECTED_EPOCH=<N>` to guard against races — when set, the script asserts `EXPECTED_EPOCH == prevEpoch + 1` before broadcasting. Logs the assigned epoch number.
 
 ### 5. Push the feed
 

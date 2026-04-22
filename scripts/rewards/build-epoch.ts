@@ -72,7 +72,6 @@ function parseCsv(path: string): Recipient[] {
   const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) die("CSV is empty");
 
-  // Skip header if first line doesn't look like an address
   const firstLineLooksLikeAddress = /^0x[0-9a-fA-F]{40}\s*,/.test(lines[0]);
   const dataLines = firstLineLooksLikeAddress ? lines : lines.slice(1);
   if (dataLines.length === 0) die("CSV has no data rows");
