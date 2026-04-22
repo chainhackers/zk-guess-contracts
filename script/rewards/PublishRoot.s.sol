@@ -16,18 +16,17 @@ contract PublishRootScript is Script {
 
         Rewards rewards = Rewards(payable(rewardsAddr));
 
-        require(rewards.owner() == msg.sender, "caller is not Rewards.owner()");
-
         uint256 prevEpoch = rewards.currentEpoch();
+        uint256 expectedEpoch = vm.envOr("EXPECTED_EPOCH", prevEpoch + 1);
+        require(expectedEpoch == prevEpoch + 1, "unexpected next epoch (race with another publish?)");
 
         vm.startBroadcast();
         uint256 epoch = rewards.publishRoot(root);
         vm.stopBroadcast();
 
-        require(epoch == prevEpoch + 1, "epoch did not increment by 1");
-
         console.log("Rewards address:", rewardsAddr);
         console.log("Previous currentEpoch:", prevEpoch);
+        console.log("Expected epoch:", expectedEpoch);
         console.log("Published epoch:", epoch);
         console.log("Root:");
         console.logBytes32(root);

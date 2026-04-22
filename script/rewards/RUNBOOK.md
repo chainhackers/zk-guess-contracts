@@ -86,7 +86,7 @@ forge script script/rewards/PublishRoot.s.sol \
   --broadcast
 ```
 
-The script asserts the deployer is `Rewards.owner()` and that `currentEpoch` increments by exactly one. Logs the assigned epoch number.
+Run this with the account that owns `Rewards`; ownership is enforced on-chain by `publishRoot`'s `onlyOwner`, so a wrong `--account` reverts the tx. Optionally pass `EXPECTED_EPOCH=<N>` to guard against races — the script asserts `prevEpoch + 1 == EXPECTED_EPOCH` before broadcasting. Logs the assigned epoch number.
 
 ### 5. Push the feed
 
@@ -105,7 +105,7 @@ Verify the feed serves the proof:
 
 ```bash
 ADDR=0x4c7ae65565a8df70cbab1b8a504c56e39da59b7a
-curl -s "https://chainhackers.github.io/zk-guess-rewards/1/${ADDR,,}.json" | jq .
+curl -s "https://chainhackers.github.io/zk-guess-rewards/1/$(printf '%s' "$ADDR" | tr '[:upper:]' '[:lower:]').json" | jq .
 ```
 
 Verify the indexer ingested `RootPublished`:
@@ -124,7 +124,7 @@ Open <https://zk-guess.chainhackers.xyz/rewards> with the recipient wallet conne
 |---|---|---|
 | Builder errors `--out … does not have chainhackers/zk-guess-rewards as a remote` | Pointed `--out` at the wrong dir | Pass the correct path or omit (defaults to `../zk-guess-rewards`) |
 | Builder errors `epoch directory already exists` | Re-running on the same epoch number | `rm -rf ../zk-guess-rewards/<N>/`, then re-run |
-| Forge script reverts with `caller is not Rewards.owner()` | Deployer keystore doesn't match the contract owner | Use the right `--account` |
+| `publishRoot` reverts with `OwnableUnauthorizedAccount` | Deployer keystore doesn't match the contract owner | Use the right `--account` |
 | Forge script reverts with `InvalidRoot` | `root.txt` is `0x000…` | Builder bug; report. Do not publish. |
 | Frontend shows `NO_REWARDS_AVAILABLE` for a known recipient | Pages hasn't redeployed yet, or addr case mismatch | Wait 60s; verify `<addr-lower>.json` exists in the repo (lowercase) |
 | `Rewards.claim` reverts with `InvalidProof` | Wrong proof JSON for the published root | Hard-refresh; if still broken, the feed is out of sync with the on-chain root — investigate before announcing |

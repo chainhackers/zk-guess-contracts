@@ -22,6 +22,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 
 interface Recipient {
@@ -62,7 +63,7 @@ function parseArgs(argv: string[]): { csv: string; epoch: number; out: string } 
   return {
     csv: resolve(positional[0]),
     epoch,
-    out: resolve(out ?? join(dirname(new URL(import.meta.url).pathname), "..", "..", "..", "zk-guess-rewards")),
+    out: resolve(out ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "zk-guess-rewards")),
   };
 }
 
@@ -72,8 +73,8 @@ function parseCsv(path: string): Recipient[] {
   if (lines.length === 0) die("CSV is empty");
 
   // Skip header if first line doesn't look like an address
-  const startsAtZero = /^0x[0-9a-fA-F]{40}\s*,/.test(lines[0]);
-  const dataLines = startsAtZero ? lines : lines.slice(1);
+  const firstLineLooksLikeAddress = /^0x[0-9a-fA-F]{40}\s*,/.test(lines[0]);
+  const dataLines = firstLineLooksLikeAddress ? lines : lines.slice(1);
   if (dataLines.length === 0) die("CSV has no data rows");
 
   const seen = new Set<string>();
