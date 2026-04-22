@@ -20,6 +20,7 @@
  *   <out>/<epoch>/ must not already exist (operator deletes manually if re-running)
  */
 
+import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,12 +100,13 @@ function parseCsv(path: string): Recipient[] {
 }
 
 function assertOutIsRewardsRepo(outDir: string) {
-  const cfg = join(outDir, ".git", "config");
-  if (!existsSync(cfg)) {
-    die(`--out ${outDir} is not a git repo (no .git/config). Clone ${REWARDS_REMOTE} first.`);
+  let remotes: string;
+  try {
+    remotes = execFileSync("git", ["-C", outDir, "remote", "-v"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  } catch {
+    die(`--out ${outDir} is not a git repo. Clone ${REWARDS_REMOTE} first.`);
   }
-  const text = readFileSync(cfg, "utf8");
-  if (!text.includes(REWARDS_REMOTE)) {
+  if (!remotes.includes(REWARDS_REMOTE)) {
     die(`--out ${outDir} does not have ${REWARDS_REMOTE} as a remote. Refusing to write.`);
   }
 }

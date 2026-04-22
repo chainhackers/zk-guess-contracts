@@ -21,10 +21,10 @@ git clone git@github.com:chainhackers/zk-guess-rewards.git ../zk-guess-rewards
 
 Confirm GitHub Pages is enabled on `main` / root for `chainhackers/zk-guess-rewards` and serves at <https://chainhackers.github.io/zk-guess-rewards/>. Confirm the frontend's `VITE_REWARDS_EPOCH_FEED_URL` env var (preview + production scopes on Vercel) matches.
 
-Install deps once:
+Install deps once (npm is canonical — CI uses `npm ci` and `package-lock.json` is the committed lockfile):
 
 ```bash
-bun install
+npm install
 ```
 
 ## Per-epoch loop
