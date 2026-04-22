@@ -42,5 +42,8 @@ states/
 # Deprecated scripts
 script/deprecated/
 
+# Rewards epoch artifacts (live in chainhackers/zk-guess-rewards, never here)
+epochs/
+
 # Circuit artifacts - versioned directories are committed
 # circuits/

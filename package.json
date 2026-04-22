@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "snarkjs": "^0.7.5",
-    "circomlibjs": "^0.1.7"
+    "circomlibjs": "^0.1.7",
+    "@openzeppelin/merkle-tree": "^1.0.7"
   }
 }
