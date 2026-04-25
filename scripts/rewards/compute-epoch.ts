@@ -8,6 +8,9 @@
  * Options:
  *   --epoch <N>            epoch number (required)
  *   --window-end <iso>     7-day window end; default = last Monday 00:00 UTC
+ *   --balance-block <tag>  block tag for Rewards balance lookup ("latest", decimal, or 0x-hex);
+ *                          default "latest". Pass the block at/after windowEnd for spec-conformant
+ *                          pool sizing; default drifts with claims/funding between windowEnd and run.
  *   --rewards-addr <addr>  defaults to Base mainnet 0x3f40...8c1c
  *   --rpc-url <url>        defaults to $BASE_RPC_URL or $BASE_MAINNET_RPC
  *   --indexer-url <url>    defaults to production HyperIndex GraphQL endpoint
@@ -16,6 +19,7 @@
  *
  * Rules (spec 2026-04-18, §v1):
  *   - Pool = floor(balance/2). Other half rolls forward.
+ *   - Skip threshold: if pool < 0.01 ETH, exit non-zero — no root for this epoch.
  *   - 30% active guesser streak: ≥1 Challenge each of 7 window days AND ≥3 total → equal split
  *   - 20% active creator streak: created ≥1 puzzle in window AND 0 forfeited → equal split
  *   - 25% top 3 puzzle creators by Puzzle count in window → 50/30/20
@@ -28,6 +32,7 @@ import { writeFileSync } from "node:fs";
 const DEFAULT_REWARDS_ADDR = "0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c";
 const DEFAULT_INDEXER_URL = "https://indexer.hyperindex.xyz/aa21ad1/v1/graphql";
 const WINDOW_SECONDS = 7 * 24 * 60 * 60;
+const MIN_POOL_WEI = 10n ** 16n; // 0.01 ETH; matches spec skip threshold
 const TOP3_WEIGHTS = [50n, 30n, 20n] as const;
 
 interface Challenge {
@@ -47,6 +52,7 @@ interface Puzzle {
 type Args = {
   epoch: number;
   windowEnd: number;
+  balanceBlock: string; // "latest" or hex/decimal block number tag (e.g. "0x1a2b" or "12345")
   rewardsAddr: string;
   rpcUrl: string;
   indexerUrl: string;
@@ -66,9 +72,17 @@ function lastMondayUtcEpochSeconds(now = new Date()): number {
   return Math.floor(midnight / 1000) - daysBack * 86400;
 }
 
+function normalizeBalanceBlock(raw: string): string {
+  if (raw === "latest") return "latest";
+  if (/^0x[0-9a-fA-F]+$/.test(raw)) return raw.toLowerCase();
+  if (/^[0-9]+$/.test(raw)) return "0x" + BigInt(raw).toString(16);
+  die(`invalid --balance-block: ${raw} (expected "latest", decimal, or 0x-hex)`);
+}
+
 function parseArgs(argv: string[]): Args {
   let epoch: number | undefined;
   let windowEndIso: string | undefined;
+  let balanceBlockRaw: string | undefined;
   let rewardsAddr = DEFAULT_REWARDS_ADDR;
   let rpcUrl = process.env.BASE_RPC_URL || process.env.BASE_MAINNET_RPC || "";
   let indexerUrl = DEFAULT_INDEXER_URL;
@@ -84,6 +98,7 @@ function parseArgs(argv: string[]): Args {
     };
     if (a === "--epoch") epoch = Number(next());
     else if (a === "--window-end") windowEndIso = next();
+    else if (a === "--balance-block") balanceBlockRaw = next();
     else if (a === "--rewards-addr") rewardsAddr = next();
     else if (a === "--rpc-url") rpcUrl = next();
     else if (a === "--indexer-url") indexerUrl = next();
@@ -104,9 +119,12 @@ function parseArgs(argv: string[]): Args {
       : Math.floor(new Date(windowEndIso).getTime() / 1000);
   if (!Number.isFinite(windowEnd) || windowEnd <= 0) die(`invalid --window-end: ${windowEndIso}`);
 
+  const balanceBlock = balanceBlockRaw === undefined ? "latest" : normalizeBalanceBlock(balanceBlockRaw);
+
   return {
     epoch,
     windowEnd,
+    balanceBlock,
     rewardsAddr,
     rpcUrl,
     indexerUrl,
@@ -115,11 +133,11 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-async function fetchBalanceWei(rpcUrl: string, addr: string): Promise<bigint> {
+async function fetchBalanceWei(rpcUrl: string, addr: string, blockTag: string): Promise<bigint> {
   const res = await fetch(rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [addr, "latest"] }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [addr, blockTag] }),
   });
   if (!res.ok) die(`RPC error ${res.status}: ${await res.text()}`);
   const json = (await res.json()) as { result?: string; error?: { message: string } };
@@ -142,7 +160,7 @@ async function gql<T>(url: string, query: string, variables: Record<string, unkn
 }
 
 async function fetchChallenges(url: string, start: number, end: number): Promise<Challenge[]> {
-  // Hasura pagination: page through by timestamp+id (stable lexical order).
+  // Hasura pagination: page through results with limit/offset, ordered by timestamp+id for stability.
   const pageSize = 1000;
   const all: Challenge[] = [];
   let offset = 0;
@@ -256,17 +274,41 @@ function formatDate(sec: number): string {
   return new Date(sec * 1000).toISOString();
 }
 
+function redactUrlForLog(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    url.search = "";
+    url.hash = "";
+    if (url.username) url.username = "***";
+    if (url.password) url.password = "***";
+    if (url.pathname && url.pathname !== "/") {
+      const parts = url.pathname.split("/");
+      const lastIndex = parts.length - 1;
+      if (parts[lastIndex] !== "") {
+        parts[lastIndex] = "***";
+      } else if (lastIndex > 0) {
+        parts[lastIndex - 1] = "***";
+      }
+      url.pathname = parts.join("/");
+    }
+    return url.toString();
+  } catch {
+    return "[redacted]";
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const windowStart = args.windowEnd - WINDOW_SECONDS;
 
   console.error(`Epoch ${args.epoch} window: [${formatDate(windowStart)}, ${formatDate(args.windowEnd)})`);
   console.error(`Rewards: ${args.rewardsAddr}`);
-  console.error(`RPC:     ${args.rpcUrl.replace(/\/[^/]+$/, "/***")}`);
-  console.error(`Indexer: ${args.indexerUrl}`);
+  console.error(`RPC:     ${redactUrlForLog(args.rpcUrl)}`);
+  console.error(`Indexer: ${redactUrlForLog(args.indexerUrl)}`);
+  console.error(`Balance block: ${args.balanceBlock}${args.balanceBlock === "latest" ? " (run-time, not epoch close)" : ""}`);
 
   const [balance, challenges, puzzles] = await Promise.all([
-    fetchBalanceWei(args.rpcUrl, args.rewardsAddr),
+    fetchBalanceWei(args.rpcUrl, args.rewardsAddr, args.balanceBlock),
     fetchChallenges(args.indexerUrl, windowStart, args.windowEnd),
     fetchPuzzles(args.indexerUrl, windowStart, args.windowEnd),
   ]);
@@ -275,7 +317,9 @@ async function main() {
   console.error(`Window activity: ${challenges.length} challenges, ${puzzles.length} puzzles`);
 
   const pool = balance / 2n;
-  if (pool === 0n) die("pool is zero (contract balance = 0); nothing to distribute");
+  if (pool < MIN_POOL_WEI) {
+    die(`pool ${pool} wei is below minimum ${MIN_POOL_WEI} wei (0.01 ETH); skip this epoch per spec`);
+  }
 
   const guesserStreakPool = (pool * 30n) / 100n;
   const creatorStreakPool = (pool * 20n) / 100n;

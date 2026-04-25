@@ -106,7 +106,12 @@ function assertOutIsRewardsRepo(outDir: string) {
   } catch {
     die(`--out ${outDir} is not a git repo. Clone ${REWARDS_REMOTE} first.`);
   }
-  if (!remotes.includes(REWARDS_REMOTE)) {
+  // Match the exact org/repo path on a remote URL boundary so siblings like
+  // "zk-guess-rewards-backup" are rejected. The path must be preceded by ":" or "/"
+  // (URL boundary) and followed by optional ".git" then whitespace/EOL (end of URL token).
+  const escaped = REWARDS_REMOTE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`[:/]${escaped}(\\.git)?(?=\\s|$)`);
+  if (!re.test(remotes)) {
     die(`--out ${outDir} does not have ${REWARDS_REMOTE} as a remote. Refusing to write.`);
   }
 }

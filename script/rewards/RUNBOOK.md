@@ -24,7 +24,7 @@ Confirm GitHub Pages is enabled on `main` / root for `chainhackers/zk-guess-rewa
 Install deps once (npm is canonical — CI uses `npm ci` and `package-lock.json` is the committed lockfile):
 
 ```bash
-npm install
+npm ci
 ```
 
 ## Per-epoch loop
@@ -38,9 +38,11 @@ source .env  # exports BASE_RPC_URL
 bun run scripts/rewards/compute-epoch.ts --epoch 1
 ```
 
-Default window ends at last Monday 00:00 UTC (strict weekly cadence). Override with `--window-end <ISO>` for catch-up or historical epochs. The script writes `/tmp/epoch-<N>.csv` and logs per-category breakdown to stderr. It exits non-zero if the contract balance is `0` or no category has eligible recipients — in that case, skip this epoch, no publish needed.
+Default window ends at last Monday 00:00 UTC (strict weekly cadence). Override with `--window-end <ISO>` for catch-up or historical epochs. The script writes `/tmp/epoch-<N>.csv` and logs per-category breakdown to stderr. It exits non-zero if the pool is below the spec's 0.01 ETH skip threshold or no category has eligible recipients — in either case skip this epoch, no publish needed.
 
-Optional overrides: `--rewards-addr`, `--rpc-url`, `--indexer-url`, `--out <path>`, `--dry-run` (stdout).
+By default the pool is sized off `eth_getBalance(...,"latest")`, which can drift from the spec ("at epoch close") if claims/funding land between `windowEnd` and run time. For a spec-exact pool, pass `--balance-block <N>` with a block at or just after `windowEnd`. The chosen block tag is logged to stderr.
+
+Optional overrides: `--rewards-addr`, `--rpc-url`, `--indexer-url`, `--out <path>`, `--dry-run` (stdout), `--balance-block <tag>`.
 
 For hand-crafted CSVs (e.g., one-off test payouts), skip this step and write the CSV directly:
 
@@ -130,7 +132,7 @@ Open <https://zk-guess.chainhackers.xyz/rewards> with the recipient wallet conne
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `compute-epoch.ts` errors `pool is zero` | Rewards contract balance is `0` | Seed the contract via `cast send --value ... --account deployer`, or skip the epoch |
+| `compute-epoch.ts` errors `pool ... is below minimum ... (0.01 ETH)` | Rewards contract balance / 2 < 0.01 ETH | Seed the contract via `cast send --value ... --account deployer`, or skip the epoch — the pool rolls forward |
 | `compute-epoch.ts` errors `no eligible recipients across all categories` | Window had no qualifying activity | Skip the epoch; the pool rolls forward. Retry next Monday. |
 | Builder errors `--out … does not have chainhackers/zk-guess-rewards as a remote` | Pointed `--out` at the wrong dir | Pass the correct path or omit (defaults to `../zk-guess-rewards`) |
 | Builder errors `epoch directory already exists` | Re-running on the same epoch number | `rm -rf ../zk-guess-rewards/<N>/`, then re-run |
