@@ -42,5 +42,11 @@ states/
 # Deprecated scripts
 script/deprecated/
 
+# Rewards epoch artifacts (live in chainhackers/zk-guess-rewards, never here)
+epochs/
+
+# Bun lockfile — npm/package-lock.json is canonical (CI runs `npm ci`)
+bun.lock
+
 # Circuit artifacts - versioned directories are committed
 # circuits/
