@@ -183,7 +183,14 @@ contract GuessGameHandler is Test {
         try game.getChallenge(puzzleId, challengeId) returns (IGuessGame.Challenge memory challenge) {
             if (challenge.guesser == address(0) || challenge.responded) return;
 
-            uint256[4] memory pubSignals = [uint256(COMMITMENT_42_123), isCorrect ? 1 : 0, 42, 100];
+            uint256[6] memory pubSignals = [
+                uint256(COMMITMENT_42_123),
+                isCorrect ? 1 : 0,
+                uint256(42),
+                uint256(100),
+                puzzleId,
+                uint256(uint160(challenge.guesser))
+            ];
 
             try game.respondToChallenge(
                 puzzleId,

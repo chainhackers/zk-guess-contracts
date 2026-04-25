@@ -4,35 +4,39 @@ pragma solidity ^0.8.30;
 import "forge-std/Script.sol";
 import "../../src/GuessGame.sol";
 
+/// @notice Demo: respond to guess A on a local-anvil deployment.
+/// @dev Reads proof JSON from $PROOF_PATH (default /tmp/proof-a.json) — generate beforehand via:
+///      `node scripts/generate-proof.js <secret> <salt> <guess> <maxNumber> <puzzleId> <guesser>`.
+///      Hardcoded proofs were dropped at the v2 circuit cutover (puzzleId+guesser binding).
 contract Step3_RespondToGuessA is Script {
-    // Valid proof for incorrect guess (50)
-    uint256[2] proofA = [
-        uint256(260224852269514550962255596791713148069192103530930225168509498623216740997),
-        uint256(3464936673232863366747749560095954607406672448198506930195439109614243395305)
-    ];
-    uint256[2][2] proofB = [
-        [
-            uint256(18076787037990225159899307248733301104058781270403724423075272532649526747523),
-            uint256(21163582130445499238873337568384386692136208661991064222861763232945956209076)
-        ],
-        [
-            uint256(14700551543044113104786011479044690264965500866720142037325671448170897252180),
-            uint256(248536395010580566114959855988956594661021088223112251086687402479116093507)
-        ]
-    ];
-    uint256[2] proofC = [
-        uint256(3718774677296111965628987936986701738438916711731522663485615268638604855259),
-        uint256(15664470303899517099778638779831003600948012776255763324223926677414563225933)
-    ];
-    uint256[4] pubSignals = [
-        uint256(13354932457729771147254927911602504548850183657014898888488396374653942452945),
-        0, // isCorrect = false
-        50, // guess
-        100 // maxNumber
-    ];
+    function _readProof()
+        internal
+        view
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals)
+    {
+        string memory path = vm.envOr("PROOF_PATH", string("/tmp/proof-a.json"));
+        string memory json = vm.readFile(path);
+        pA[0] = vm.parseJsonUint(json, ".pA[0]");
+        pA[1] = vm.parseJsonUint(json, ".pA[1]");
+        pB[0][0] = vm.parseJsonUint(json, ".pB[0][0]");
+        pB[0][1] = vm.parseJsonUint(json, ".pB[0][1]");
+        pB[1][0] = vm.parseJsonUint(json, ".pB[1][0]");
+        pB[1][1] = vm.parseJsonUint(json, ".pB[1][1]");
+        pC[0] = vm.parseJsonUint(json, ".pC[0]");
+        pC[1] = vm.parseJsonUint(json, ".pC[1]");
+        for (uint256 i = 0; i < 6; i++) {
+            pubSignals[i] = vm.parseJsonUint(json, string.concat(".pubSignals[", vm.toString(i), "]"));
+        }
+    }
 
     function run(address gameAddress, uint256 puzzleId, uint256 challengeId) external {
         GuessGame game = GuessGame(gameAddress);
+        (
+            uint256[2] memory proofA,
+            uint256[2][2] memory proofB,
+            uint256[2] memory proofC,
+            uint256[6] memory pubSignals
+        ) = _readProof();
 
         vm.startBroadcast();
 

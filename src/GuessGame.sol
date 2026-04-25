@@ -192,7 +192,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[4] calldata _pubSignals
+        uint256[6] calldata _pubSignals
     ) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
@@ -208,7 +208,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Verify the proof using external verifier
         if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
 
-        // Extract public signals: [commitment, isCorrect, guess, maxNumber]
+        // Public signals: [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
         bytes32 commitment = bytes32(_pubSignals[0]);
         bool isCorrect = _pubSignals[1] == 1;
         uint256 proofGuess = _pubSignals[2];
@@ -218,6 +218,8 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (commitment != puzzle.commitment) revert InvalidProof();
         if (proofGuess != challenge.guess) revert InvalidProofForChallengeGuess();
         if (proofMaxNumber != puzzle.maxNumber) revert InvalidProof();
+        if (_pubSignals[4] != puzzleId) revert InvalidPuzzleIdBinding();
+        if (_pubSignals[5] != uint256(uint160(challenge.guesser))) revert InvalidGuesserBinding();
 
         challenge.responded = true;
         puzzle.pendingChallenges--;

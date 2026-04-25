@@ -77,8 +77,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 guesserBalanceBefore = guesser.balance;
 
         // Generate proof dynamically via FFI
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-            generateProof(secret, salt, guess);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProof(secret, salt, guess, puzzleId, guesser);
 
         // Verify pubSignals are correct
         assertEq(pubSignals[1], 1, "isCorrect should be 1 for correct guess");
@@ -121,8 +121,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 guesserBalanceBefore = guesser.balance;
 
         // Generate proof dynamically via FFI
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-            generateProof(secret, salt, guess);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProof(secret, salt, guess, puzzleId, guesser);
 
         // Verify pubSignals are correct
         assertEq(pubSignals[1], 0, "isCorrect should be 0 for incorrect guess");
@@ -163,8 +163,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, wrongGuess);
 
         // Generate proof for wrong guess
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-            generateProof(secret, salt, wrongGuess);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProof(secret, salt, wrongGuess, puzzleId, guesser);
 
         // Verify pubSignals
         assertEq(pubSignals[1], 0, "isCorrect should be 0");
@@ -182,7 +182,7 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 correctChallengeId = game.submitGuess{value: 0.01 ether}(puzzleId, secret);
 
         // Generate proof for correct guess
-        (pA, pB, pC, pubSignals) = generateProof(secret, salt, secret);
+        (pA, pB, pC, pubSignals) = generateProof(secret, salt, secret, puzzleId, guesser);
 
         assertEq(pubSignals[1], 1, "isCorrect should be 1");
 
@@ -225,8 +225,8 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         // Respond to wrong guess first
         {
-            (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-                generateProof(secret, salt, 100);
+            (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+                generateProof(secret, salt, 100, puzzleId, guesser);
 
             vm.prank(creator);
             game.respondToChallenge(puzzleId, challengeId1, pA, pB, pC, pubSignals);
@@ -235,10 +235,10 @@ contract DynamicProofTest is Test, ProofGenerator {
         // Puzzle not solved yet
         assertFalse(game.getPuzzle(puzzleId).solved, "Puzzle should not be solved yet");
 
-        // Respond to correct guess
+        // Respond to correct guess (challengeId2 was submitted by guesser2)
         {
-            (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-                generateProof(secret, salt, secret);
+            (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+                generateProof(secret, salt, secret, puzzleId, guesser2);
 
             vm.prank(creator);
             game.respondToChallenge(puzzleId, challengeId2, pA, pB, pC, pubSignals);
@@ -281,8 +281,8 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, wrongGuess);
 
         // Generate proof for wrong guess
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals) =
-            generateProof(secret, salt, wrongGuess);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProof(secret, salt, wrongGuess, puzzleId, guesser);
 
         assertEq(pubSignals[1], 0, "isCorrect should be 0");
 
@@ -297,7 +297,7 @@ contract DynamicProofTest is Test, ProofGenerator {
         uint256 correctChallengeId = game.submitGuess{value: 0.01 ether}(puzzleId, secret);
 
         // Generate proof for correct guess
-        (pA, pB, pC, pubSignals) = generateProof(secret, salt, secret);
+        (pA, pB, pC, pubSignals) = generateProof(secret, salt, secret, puzzleId, guesser);
 
         assertEq(pubSignals[1], 1, "isCorrect should be 1");
 
@@ -329,7 +329,7 @@ contract DynamicProofTest is Test, ProofGenerator {
         assertEq(puzzle.commitment, commitment, "Stored commitment should match FFI-generated one");
 
         // Generate a proof and verify the commitment in pubSignals matches
-        (,,, uint256[4] memory pubSignals) = generateProof(secret, salt, secret);
+        (,,, uint256[6] memory pubSignals) = generateProof(secret, salt, secret, puzzleId, guesser);
 
         assertEq(bytes32(pubSignals[0]), commitment, "Proof commitment should match puzzle commitment");
     }
