@@ -10,29 +10,11 @@ import "../src/GuessGame.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "../src/interfaces/ISettleable.sol";
 import "./mocks/CurrentGuessGame.sol";
-
-contract MockVerifierSettle {
-    // Both shapes for parity with the v1 mocks imported via CurrentGuessGame.
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[4] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[6] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 contract SettleAllTest is Test {
     GuessGame public game;
-    MockVerifierSettle public verifier;
+    AlwaysAcceptVerifier public verifier;
     ERC1967Proxy public proxy;
 
     address owner;
@@ -60,7 +42,7 @@ contract SettleAllTest is Test {
 
         commitment = keccak256(abi.encodePacked(uint256(42), uint256(123)));
 
-        verifier = new MockVerifierSettle();
+        verifier = new AlwaysAcceptVerifier();
 
         GuessGame impl = new GuessGame();
         bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, owner));

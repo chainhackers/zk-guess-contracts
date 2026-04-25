@@ -4,20 +4,11 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
-/// @notice Mock verifier that always accepts. Game-flow tests in this file exercise contract
-/// state transitions, not Groth16 math; the real circuit is exercised by integration tests
-/// in test/integration/DynamicProofTest.t.sol via FFI.
-contract MockGuessVerifier {
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[6] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
-
+// Game-flow tests in this file exercise contract state transitions, not Groth16 math; the
+// real circuit is exercised by integration tests in test/integration/DynamicProofTest.t.sol
+// via FFI.
 contract GuessGameWithProofsTest is Test {
     function deployGameProxy(address _verifier, address _treasury) internal returns (GuessGame) {
         GuessGame impl = new GuessGame();
@@ -26,7 +17,7 @@ contract GuessGameWithProofsTest is Test {
         return GuessGame(address(proxy));
     }
 
-    MockGuessVerifier public verifier;
+    AlwaysAcceptVerifier public verifier;
     GuessGame public game;
 
     address creator;
@@ -42,24 +33,6 @@ contract GuessGameWithProofsTest is Test {
     uint256[2] validProofACorrect = [uint256(1), uint256(1)];
     uint256[2][2] validProofBCorrect = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
     uint256[2] validProofCCorrect = [uint256(1), uint256(1)];
-    uint256[2] validProofAIncorrect = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBIncorrect = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCIncorrect = [uint256(1), uint256(1)];
-    uint256[2] validProofAIncorrect99 = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBIncorrect99 = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCIncorrect99 = [uint256(1), uint256(1)];
-    uint256[2] validProofACorrect1000 = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBCorrect1000 = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCCorrect1000 = [uint256(1), uint256(1)];
-    uint256[2] validProofAIncorrect1000 = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBIncorrect1000 = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCIncorrect1000 = [uint256(1), uint256(1)];
-    uint256[2] validProofACorrect65535 = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBCorrect65535 = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCCorrect65535 = [uint256(1), uint256(1)];
-    uint256[2] validProofAIncorrect65535 = [uint256(1), uint256(1)];
-    uint256[2][2] validProofBIncorrect65535 = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
-    uint256[2] validProofCIncorrect65535 = [uint256(1), uint256(1)];
 
     function _pubSig(
         bytes32 commitment,
@@ -111,7 +84,7 @@ contract GuessGameWithProofsTest is Test {
         treasury = makeAddr("treasury");
 
         // Deploy mock verifier (always-accepts) — game-flow tests, not Groth16 round-trip
-        verifier = new MockGuessVerifier();
+        verifier = new AlwaysAcceptVerifier();
         // Deploy game via proxy
         game = deployGameProxy(address(verifier), treasury);
 

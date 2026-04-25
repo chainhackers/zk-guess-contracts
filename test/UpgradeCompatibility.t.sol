@@ -6,28 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import "../src/GuessGame.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "./mocks/OldGuessGame.sol";
-
-/// @title MockVerifier
-/// @notice Always-accept mock supporting both v1 ([4]) and v2 ([6]) public-signal shapes,
-///         so a single deployment can serve OldGuessGame pre-upgrade and the new GuessGame
-///         post-upgrade through the same proxy storage slot.
-contract MockVerifier {
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[4] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[6] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 /// @title UpgradeCompatibilityTest
 /// @notice Tests upgrade from OldGuessGame (commit e6bc579) to new GuessGame
@@ -35,7 +14,7 @@ contract MockVerifier {
 contract UpgradeCompatibilityTest is Test {
     OldGuessGame public oldImpl;
     GuessGame public newImpl;
-    MockVerifier public verifier;
+    AlwaysAcceptVerifier public verifier;
     ERC1967Proxy public proxy;
 
     address owner;
@@ -53,7 +32,7 @@ contract UpgradeCompatibilityTest is Test {
         vm.deal(guesser, 10 ether);
 
         // Deploy mock verifier
-        verifier = new MockVerifier();
+        verifier = new AlwaysAcceptVerifier();
 
         // Deploy OLD implementation via proxy
         oldImpl = new OldGuessGame();

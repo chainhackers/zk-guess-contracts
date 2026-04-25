@@ -3,31 +3,12 @@ pragma solidity ^0.8.30;
 
 import "forge-std/Script.sol";
 import "../../src/GuessGame.sol";
+import {ProofIO} from "./ProofIO.sol";
 
 /// @notice Demo: respond to guess B (correct guess) on a local-anvil deployment.
 /// @dev Reads proof JSON from $PROOF_PATH (default /tmp/proof-b.json) — generate beforehand via:
 ///      `node scripts/generate-proof.js <secret> <salt> <guess> <maxNumber> <puzzleId> <guesser>`.
-contract Step5_RespondToGuessB is Script {
-    function _readProof()
-        internal
-        view
-        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals)
-    {
-        string memory path = vm.envOr("PROOF_PATH", string("/tmp/proof-b.json"));
-        string memory json = vm.readFile(path);
-        pA[0] = vm.parseJsonUint(json, ".pA[0]");
-        pA[1] = vm.parseJsonUint(json, ".pA[1]");
-        pB[0][0] = vm.parseJsonUint(json, ".pB[0][0]");
-        pB[0][1] = vm.parseJsonUint(json, ".pB[0][1]");
-        pB[1][0] = vm.parseJsonUint(json, ".pB[1][0]");
-        pB[1][1] = vm.parseJsonUint(json, ".pB[1][1]");
-        pC[0] = vm.parseJsonUint(json, ".pC[0]");
-        pC[1] = vm.parseJsonUint(json, ".pC[1]");
-        for (uint256 i = 0; i < 6; i++) {
-            pubSignals[i] = vm.parseJsonUint(json, string.concat(".pubSignals[", vm.toString(i), "]"));
-        }
-    }
-
+contract Step5_RespondToGuessB is Script, ProofIO {
     function run(address gameAddress, uint256 puzzleId, uint256 challengeId) external {
         GuessGame game = GuessGame(gameAddress);
         (
@@ -35,7 +16,7 @@ contract Step5_RespondToGuessB is Script {
             uint256[2][2] memory proofB,
             uint256[2] memory proofC,
             uint256[6] memory pubSignals
-        ) = _readProof();
+        ) = _readProofFrom(vm.envOr("PROOF_PATH", string("/tmp/proof-b.json")));
 
         vm.startBroadcast();
 

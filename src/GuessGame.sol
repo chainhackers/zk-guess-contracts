@@ -205,21 +205,22 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
 
-        // Verify the proof using external verifier
-        if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
-
-        // Public signals: [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
-        bytes32 commitment = bytes32(_pubSignals[0]);
+        bytes32 proofCommitment = bytes32(_pubSignals[0]);
         bool isCorrect = _pubSignals[1] == 1;
         uint256 proofGuess = _pubSignals[2];
         uint256 proofMaxNumber = _pubSignals[3];
+        uint256 proofPuzzleId = _pubSignals[4];
+        uint256 proofGuesser = _pubSignals[5];
 
-        // Verify proof matches puzzle parameters
-        if (commitment != puzzle.commitment) revert InvalidProof();
+        // Match cheap calldata equalities before the pairing check so malformed/replayed
+        // submissions don't pay the ~200k gas verifyProof costs.
+        if (proofCommitment != puzzle.commitment) revert InvalidProof();
         if (proofGuess != challenge.guess) revert InvalidProofForChallengeGuess();
         if (proofMaxNumber != puzzle.maxNumber) revert InvalidProof();
-        if (_pubSignals[4] != puzzleId) revert InvalidPuzzleIdBinding();
-        if (_pubSignals[5] != uint256(uint160(challenge.guesser))) revert InvalidGuesserBinding();
+        if (proofPuzzleId != puzzleId) revert InvalidPuzzleIdBinding();
+        if (proofGuesser != uint256(uint160(challenge.guesser))) revert InvalidGuesserBinding();
+
+        if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
 
         challenge.responded = true;
         puzzle.pendingChallenges--;

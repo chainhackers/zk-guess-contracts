@@ -4,17 +4,7 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-
-/// @notice Snapshot of the pre-v2 verifier interface (4 public signals). Kept inline so this
-/// time-capsule mock continues to compile independent of the live IGroth16VerifierV1 (now [6]).
-interface IGroth16VerifierV1 {
-    function verifyProof(
-        uint256[2] calldata _pA,
-        uint256[2][2] calldata _pB,
-        uint256[2] calldata _pC,
-        uint256[4] calldata _pubSignals
-    ) external view returns (bool);
-}
+import "./IGroth16VerifierV1.sol";
 
 /// @title CurrentGuessGame
 /// @notice Currently deployed version (impl 0xa73cD3792623Bc21ecA8ae5226a23Dd953A5592A) for upgrade testing
