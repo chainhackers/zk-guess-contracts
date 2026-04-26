@@ -333,4 +333,80 @@ contract DynamicProofTest is Test, ProofGenerator {
 
         assertEq(bytes32(pubSignals[0]), commitment, "Proof commitment should match puzzle commitment");
     }
+
+    /// @notice MIXER would: a valid proof for the same secret unlocks any deposit.
+    /// @notice HERE: a real Groth16 proof minted for puzzle X cannot service puzzle Y
+    ///         even when both share the identical commitment. The contract-side
+    ///         InvalidPuzzleIdBinding check fires; the puzzleId is also a snark public
+    ///         input, so the verifier itself constrains it.
+    function test_DynamicProof_NotAMixer_PuzzleIdReplayRejected() public {
+        uint256 secret = 42;
+        uint256 salt = 123;
+        bytes32 commitment = computeCommitment(secret, salt);
+
+        // Two puzzles, same commitment.
+        vm.prank(creator);
+        uint256 puzzleX = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
+        vm.prank(creator);
+        uint256 puzzleY = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
+
+        address guesserY = makeAddr("guesserY");
+        vm.deal(guesserY, 10 ether);
+
+        vm.prank(guesserY);
+        uint256 challengeOnY = game.submitGuess{value: 0.01 ether}(puzzleY, secret);
+
+        // Real Groth16 proof bound to puzzleX (with guesserY as recipient so the guesser
+        // binding check doesn't trip first — only the puzzleId mismatch should reject).
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProofWithMaxNumber(secret, salt, secret, 65535, puzzleX, guesserY);
+
+        // pubSignals[4] == puzzleX, but we submit against puzzleY — InvalidPuzzleIdBinding.
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidPuzzleIdBinding.selector);
+        game.respondToChallenge(puzzleY, challengeOnY, pA, pB, pC, pubSignals);
+
+        // Re-bind: regenerate the proof for puzzleY and confirm the positive path.
+        (pA, pB, pC, pubSignals) = generateProofWithMaxNumber(secret, salt, secret, 65535, puzzleY, guesserY);
+        vm.prank(creator);
+        game.respondToChallenge(puzzleY, challengeOnY, pA, pB, pC, pubSignals);
+        assertTrue(game.getPuzzle(puzzleY).solved, "puzzle Y solved after re-bind");
+    }
+
+    /// @notice MIXER would: any address holding a valid proof can withdraw.
+    /// @notice HERE: a real Groth16 proof bound to guesserA cannot service guesserB's
+    ///         challenge — the contract-side InvalidGuesserBinding check fires, and
+    ///         the guesser is also a snark public input the verifier constrains.
+    function test_DynamicProof_NotAMixer_GuesserReplayRejected() public {
+        uint256 secret = 73;
+        uint256 salt = 456;
+        bytes32 commitment = computeCommitment(secret, salt);
+
+        vm.prank(creator);
+        uint256 puzzleId = game.createPuzzle{value: 0.2 ether}(commitment, 0.0001 ether, 0.01 ether, 65535);
+
+        address guesserA = guesser;
+        address guesserB = makeAddr("guesserB");
+        vm.deal(guesserB, 10 ether);
+
+        // Both guessers submit the same correct guess — different challenges, different recipients.
+        vm.prank(guesserA);
+        uint256 challengeA = game.submitGuess{value: 0.01 ether}(puzzleId, secret);
+        vm.prank(guesserB);
+        uint256 challengeB = game.submitGuess{value: 0.01 ether}(puzzleId, secret + 1); // different guess avoids dup
+
+        // Real proof bound to guesserA. Try to use it on challenge B (whose guesser is guesserB).
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals) =
+            generateProofWithMaxNumber(secret, salt, secret + 1, 65535, puzzleId, guesserA);
+
+        vm.prank(creator);
+        vm.expectRevert(IGuessGame.InvalidGuesserBinding.selector);
+        game.respondToChallenge(puzzleId, challengeB, pA, pB, pC, pubSignals);
+
+        // Sanity: the same proof, on guesserA's challenge, lands cleanly.
+        (pA, pB, pC, pubSignals) = generateProofWithMaxNumber(secret, salt, secret, 65535, puzzleId, guesserA);
+        vm.prank(creator);
+        game.respondToChallenge(puzzleId, challengeA, pA, pB, pC, pubSignals);
+        assertTrue(game.getPuzzle(puzzleId).solved, "puzzle solved by guesserA's legit proof");
+    }
 }
