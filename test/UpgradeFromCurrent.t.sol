@@ -6,25 +6,14 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import "../src/GuessGame.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "./mocks/CurrentGuessGame.sol";
-
-/// @title MockVerifier
-/// @notice Mock verifier for testing - always returns true
-contract MockVerifierCurrent {
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[4] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 /// @title UpgradeFromCurrentTest
 /// @notice Tests upgrade from CurrentGuessGame (3-arg, deployed impl) to new GuessGame (4-arg)
 contract UpgradeFromCurrentTest is Test {
     CurrentGuessGame public oldImpl;
     GuessGame public newImpl;
-    MockVerifierCurrent public verifier;
+    AlwaysAcceptVerifier public verifier;
     ERC1967Proxy public proxy;
 
     address owner;
@@ -53,7 +42,7 @@ contract UpgradeFromCurrentTest is Test {
 
         commitment = keccak256(abi.encodePacked(uint256(42), uint256(123)));
 
-        verifier = new MockVerifierCurrent();
+        verifier = new AlwaysAcceptVerifier();
 
         // Deploy CurrentGuessGame (3-arg) via proxy
         oldImpl = new CurrentGuessGame();
@@ -78,8 +67,10 @@ contract UpgradeFromCurrentTest is Test {
         challengeId = CurrentGuessGame(address(proxy)).submitGuess{value: 0.01 ether}(puzzleId, guess);
     }
 
-    function _pubSignals(uint256 guess, uint256 isCorrect) internal view returns (uint256[4] memory) {
-        return [uint256(uint256(commitment)), isCorrect, guess, 100];
+    function _pubSignals(uint256 guess, uint256 isCorrect) internal view returns (uint256[6] memory) {
+        // Both call sites in this file use the first puzzle (id 0) and the default `guesser`
+        // address, so hardcoding here keeps the call sites compact.
+        return [uint256(uint256(commitment)), isCorrect, guess, 100, 0, uint256(uint160(guesser))];
     }
 
     /// @notice Upgrade preserves all puzzle state fields

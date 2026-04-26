@@ -10,20 +10,11 @@ import "../src/GuessGame.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "../src/interfaces/ISettleable.sol";
 import "./mocks/CurrentGuessGame.sol";
-
-contract MockVerifierSettle {
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[4] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 contract SettleAllTest is Test {
     GuessGame public game;
-    MockVerifierSettle public verifier;
+    AlwaysAcceptVerifier public verifier;
     ERC1967Proxy public proxy;
 
     address owner;
@@ -51,7 +42,7 @@ contract SettleAllTest is Test {
 
         commitment = keccak256(abi.encodePacked(uint256(42), uint256(123)));
 
-        verifier = new MockVerifierSettle();
+        verifier = new AlwaysAcceptVerifier();
 
         GuessGame impl = new GuessGame();
         bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, owner));
@@ -67,7 +58,14 @@ contract SettleAllTest is Test {
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         vm.prank(creator);
-        game.respondToChallenge(puzzleId, challengeId, pA, pB, pC, [uint256(uint256(commitment)), 1, 42, 100]);
+        game.respondToChallenge(
+            puzzleId,
+            challengeId,
+            pA,
+            pB,
+            pC,
+            [uint256(uint256(commitment)), 1, 42, 100, puzzleId, uint256(uint160(guesser))]
+        );
 
         // Creator has 0.5 ether collateral in balances now
         assertEq(game.balances(creator), 0.5 ether);
@@ -512,7 +510,14 @@ contract SettleAllTest is Test {
         game.pause();
 
         vm.prank(creator);
-        game.respondToChallenge(0, challengeId, pA, pB, pC, [uint256(uint256(commitment)), 0, 42, 100]);
+        game.respondToChallenge(
+            0,
+            challengeId,
+            pA,
+            pB,
+            pC,
+            [uint256(uint256(commitment)), 0, 42, 100, uint256(0), uint256(uint160(guesser))]
+        );
     }
 
     function test_pause_allowsForfeitPuzzle() public {

@@ -192,7 +192,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[4] calldata _pubSignals
+        uint256[6] calldata _pubSignals
     ) external notSettled {
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
@@ -205,19 +205,22 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (challenge.guesser == address(0)) revert ChallengeNotFound();
         if (challenge.responded) revert ChallengeAlreadyResponded();
 
-        // Verify the proof using external verifier
-        if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
-
-        // Extract public signals: [commitment, isCorrect, guess, maxNumber]
-        bytes32 commitment = bytes32(_pubSignals[0]);
+        bytes32 proofCommitment = bytes32(_pubSignals[0]);
         bool isCorrect = _pubSignals[1] == 1;
         uint256 proofGuess = _pubSignals[2];
         uint256 proofMaxNumber = _pubSignals[3];
+        uint256 proofPuzzleId = _pubSignals[4];
+        uint256 proofGuesser = _pubSignals[5];
 
-        // Verify proof matches puzzle parameters
-        if (commitment != puzzle.commitment) revert InvalidProof();
+        // Match cheap calldata equalities before the pairing check so malformed/replayed
+        // submissions don't pay the ~200k gas verifyProof costs.
+        if (proofCommitment != puzzle.commitment) revert InvalidProof();
         if (proofGuess != challenge.guess) revert InvalidProofForChallengeGuess();
         if (proofMaxNumber != puzzle.maxNumber) revert InvalidProof();
+        if (proofPuzzleId != puzzleId) revert InvalidPuzzleIdBinding();
+        if (proofGuesser != uint256(uint160(challenge.guesser))) revert InvalidGuesserBinding();
+
+        if (!verifier.verifyProof(_pA, _pB, _pC, _pubSignals)) revert InvalidProof();
 
         challenge.responded = true;
         puzzle.pendingChallenges--;

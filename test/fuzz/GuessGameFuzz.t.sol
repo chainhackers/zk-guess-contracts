@@ -200,7 +200,7 @@ contract GuessGameFuzz is Test {
             uint256 guesserIdx = _getGuesserIndex(guesser);
             uint256 stake = challengeStakes[challengeIdx];
 
-            uint256[4] memory pubSignals = [uint256(COMMITMENT_42_123), 0, i, 100];
+            uint256[6] memory pubSignals = [uint256(COMMITMENT_42_123), 0, i, 100, puzzleId, uint256(uint160(guesser))];
 
             vm.prank(creator);
             game.respondToChallenge(

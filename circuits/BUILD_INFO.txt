@@ -1,0 +1,6 @@
+BUILD=dev
+WARNING: Single-contributor dev setup, NOT a trusted-setup ceremony. Do not deploy the derived GuessVerifier.sol to mainnet. Shipping artifacts will be copied separately after the phase-2 ceremony produces guess_final.zkey.
+SOURCE_REPO=chainhackers/zk-guess-circuits
+SOURCE_SHA=a4236e24ea68882ab33746d3b6208b1a577086a9
+SOURCE_DESCRIBE=a4236e2
+COPIED_AT=2026-04-25T13:42:24Z

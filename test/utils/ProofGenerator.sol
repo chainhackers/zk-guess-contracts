@@ -5,88 +5,82 @@ import "forge-std/Test.sol";
 
 /**
  * @title ProofGenerator
- * @notice Abstract contract providing FFI-based ZK proof generation for tests
- * @dev Uses Node.js + snarkjs to generate Groth16 proofs on the fly
+ * @notice Abstract contract providing FFI-based ZK proof generation for v2 circuit tests.
+ * @dev Drives Node.js + snarkjs against the dev artifacts at circuits/guess.wasm and
+ *      circuits/guess_dev.zkey to produce real Groth16 proofs that satisfy the v2 verifier.
  */
 abstract contract ProofGenerator is Test {
     /**
-     * @notice Generate a ZK proof using FFI
+     * @notice Generate a v2 ZK proof using FFI with default maxNumber (65535).
      * @param secret The secret number
      * @param salt The salt used in commitment
      * @param guess The guess being verified
+     * @param puzzleId The puzzleId bound into the proof (must match contract puzzleId)
+     * @param guesserAddr The guesser address bound into the proof (must match challenge.guesser)
      * @return pA First part of proof
      * @return pB Second part of proof (2x2 matrix)
      * @return pC Third part of proof
-     * @return pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
+     * @return pubSignals Public signals: [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
      */
-    function generateProof(uint256 secret, uint256 salt, uint256 guess)
+    function generateProof(uint256 secret, uint256 salt, uint256 guess, uint256 puzzleId, address guesserAddr)
         internal
-        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals)
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals)
     {
-        return generateProofWithMaxNumber(secret, salt, guess, 65535);
+        return generateProofWithMaxNumber(secret, salt, guess, 65535, puzzleId, guesserAddr);
     }
 
     /**
-     * @notice Generate a ZK proof using FFI with custom maxNumber
-     * @param secret The secret number
-     * @param salt The salt used in commitment
-     * @param guess The guess being verified
-     * @param maxNumber The maximum number for the puzzle
-     * @return pA First part of proof
-     * @return pB Second part of proof (2x2 matrix)
-     * @return pC Third part of proof
-     * @return pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
+     * @notice Generate a v2 ZK proof using FFI with explicit maxNumber.
      */
-    function generateProofWithMaxNumber(uint256 secret, uint256 salt, uint256 guess, uint256 maxNumber)
+    function generateProofWithMaxNumber(
+        uint256 secret,
+        uint256 salt,
+        uint256 guess,
+        uint256 maxNumber,
+        uint256 puzzleId,
+        address guesserAddr
+    )
         internal
-        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[4] memory pubSignals)
+        returns (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint256[6] memory pubSignals)
     {
-        // Build FFI command
-        string[] memory inputs = new string[](6);
+        string[] memory inputs = new string[](8);
         inputs[0] = "node";
         inputs[1] = "scripts/generate-proof.js";
         inputs[2] = vm.toString(secret);
         inputs[3] = vm.toString(salt);
         inputs[4] = vm.toString(guess);
         inputs[5] = vm.toString(maxNumber);
+        inputs[6] = vm.toString(puzzleId);
+        inputs[7] = vm.toString(guesserAddr);
 
-        // Execute FFI call
         bytes memory result = vm.ffi(inputs);
-
-        // Parse JSON result
         string memory json = string(result);
 
-        // Parse pA
         pA[0] = vm.parseJsonUint(json, ".pA[0]");
         pA[1] = vm.parseJsonUint(json, ".pA[1]");
 
-        // Parse pB (note: 2D array with swapped coordinates for Solidity)
+        // pB inner pairs are EVM-friendly already (script swaps once)
         pB[0][0] = vm.parseJsonUint(json, ".pB[0][0]");
         pB[0][1] = vm.parseJsonUint(json, ".pB[0][1]");
         pB[1][0] = vm.parseJsonUint(json, ".pB[1][0]");
         pB[1][1] = vm.parseJsonUint(json, ".pB[1][1]");
 
-        // Parse pC
         pC[0] = vm.parseJsonUint(json, ".pC[0]");
         pC[1] = vm.parseJsonUint(json, ".pC[1]");
 
-        // Parse pubSignals
-        pubSignals[0] = vm.parseJsonUint(json, ".pubSignals[0]");
-        pubSignals[1] = vm.parseJsonUint(json, ".pubSignals[1]");
-        pubSignals[2] = vm.parseJsonUint(json, ".pubSignals[2]");
-        pubSignals[3] = vm.parseJsonUint(json, ".pubSignals[3]");
+        for (uint256 i = 0; i < 6; i++) {
+            pubSignals[i] = vm.parseJsonUint(json, string.concat(".pubSignals[", vm.toString(i), "]"));
+        }
     }
 
     /**
-     * @notice Helper to compute commitment (for tests that need it without generating full proof)
-     * @dev Uses FFI to call snarkjs which uses Poseidon hash
-     * @param secret The secret number
-     * @param salt The salt
-     * @return commitment The Poseidon hash commitment
+     * @notice Helper to compute the commitment (Poseidon([DOMAIN_TAG, secret, salt])) via FFI.
+     * @dev Generates a throwaway proof just to read commitment back out of public signals;
+     *      `puzzleId` and `guesser` bindings are irrelevant for this lookup since the contract
+     *      only consumes `pubSignals[0]` here.
      */
     function computeCommitment(uint256 secret, uint256 salt) internal returns (bytes32 commitment) {
-        // Generate proof just to get the commitment from pubSignals
-        (,,, uint256[4] memory pubSignals) = generateProof(secret, salt, 0);
+        (,,, uint256[6] memory pubSignals) = generateProof(secret, salt, secret, 0, address(0));
         return bytes32(pubSignals[0]);
     }
 }

@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * Generate ZK proof for GuessGame using snarkjs
- * Usage: node scripts/generate-proof.js <number> <salt> <guess> <maxNumber>
- * Output: JSON with pA, pB, pC, pubSignals formatted for Solidity
+ * Generate ZK proof for GuessGame v2 using snarkjs.
+ * Usage: node scripts/generate-proof.js <number> <salt> <guess> <maxNumber> <puzzleId> <guesser>
+ * Output: JSON with pA, pB, pC, pubSignals formatted for Solidity.
  *
- * Circuit inputs: number, salt, guess, maxNumber
- * Circuit outputs (public signals): commitment, isCorrect, guess, maxNumber
+ * Circuit inputs:  number, salt, guess, maxNumber, puzzleId, guesser
+ * Public signals:  [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
+ *
+ * Artifacts: dev build copied from chainhackers/zk-guess-circuits via
+ * `bun run copy-to-contracts`. See circuits/BUILD_INFO.txt for the source SHA.
  */
 
 const snarkjs = require("snarkjs");
@@ -15,19 +18,16 @@ const fs = require("fs");
 async function main() {
   const args = process.argv.slice(2);
 
-  if (args.length !== 4) {
-    console.error("Usage: node generate-proof.js <number> <salt> <guess> <maxNumber>");
+  if (args.length !== 6) {
+    console.error("Usage: node scripts/generate-proof.js <number> <salt> <guess> <maxNumber> <puzzleId> <guesser>");
     process.exit(1);
   }
 
-  const [number, salt, guess, maxNumber] = args.map((x) => x.toString());
+  const [number, salt, guess, maxNumber, puzzleId, guesser] = args.map((x) => x.toString());
 
-  // Paths to circuit artifacts (versioned by verifier address)
-  const verifierAddr = "0xdcfba8812fd5a7427e24d0105c11c174d5b8fa34";
-  const wasmPath = path.join(__dirname, `../circuits/${verifierAddr}/guess.wasm`);
-  const zkeyPath = path.join(__dirname, `../circuits/${verifierAddr}/guess_final.zkey`);
+  const wasmPath = path.join(__dirname, "../circuits/guess.wasm");
+  const zkeyPath = path.join(__dirname, "../circuits/guess_dev.zkey");
 
-  // Verify files exist
   if (!fs.existsSync(wasmPath)) {
     console.error(`WASM file not found: ${wasmPath}`);
     process.exit(1);
@@ -37,40 +37,36 @@ async function main() {
     process.exit(1);
   }
 
-  // Circuit inputs (commitment is computed by circuit, not provided)
+  // guesser is an Ethereum address; pass as decimal field element
+  const guesserField = BigInt(guesser).toString();
+
   const input = {
     number: number,
     salt: salt,
     guess: guess,
-    maxNumber: maxNumber
+    maxNumber: maxNumber,
+    puzzleId: puzzleId,
+    guesser: guesserField,
   };
 
-  // Generate the proof
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
     input,
     wasmPath,
     zkeyPath
   );
 
-  // Format proof for Solidity (convert to BigInt strings)
-  // pA: [x, y]
-  // pB: [[x1, x2], [y1, y2]] - note: swapped order for Solidity
-  // pC: [x, y]
-  // pubSignals: [commitment, isCorrect, guess, maxNumber]
+  // Format proof for Solidity (snarkjs orders pB inner pairs the EVM-friendly way after swap)
   const solidityProof = {
     pA: [proof.pi_a[0], proof.pi_a[1]],
     pB: [
-      [proof.pi_b[0][1], proof.pi_b[0][0]], // Swap inner coordinates
+      [proof.pi_b[0][1], proof.pi_b[0][0]],
       [proof.pi_b[1][1], proof.pi_b[1][0]]
     ],
     pC: [proof.pi_c[0], proof.pi_c[1]],
     pubSignals: publicSignals
   };
 
-  // Output as JSON
   console.log(JSON.stringify(solidityProof));
-
-  // Exit explicitly - snarkjs uses workers that keep event loop alive
   process.exit(0);
 }
 

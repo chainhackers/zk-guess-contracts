@@ -133,6 +133,16 @@ interface IGuessGame {
     /// @notice Thrown when proof public signals don't match challenge parameters
     error InvalidProofForChallengeGuess();
 
+    /// @notice Thrown when proof's bound puzzleId doesn't match the puzzle being responded to
+    /// @dev Public signal index 4 must equal the puzzleId argument; prevents replay across puzzles
+    ///      that happen to share the same commitment.
+    error InvalidPuzzleIdBinding();
+
+    /// @notice Thrown when proof's bound guesser address doesn't match the challenge's guesser
+    /// @dev Public signal index 5 must equal uint256(uint160(challenge.guesser)); prevents
+    ///      a third party from replaying a leaked proof against a different challenger.
+    error InvalidGuesserBinding();
+
     /// @notice Thrown when referencing a non-existent challenge
     error ChallengeNotFound();
 
@@ -218,17 +228,19 @@ interface IGuessGame {
     /// @param _pA First component of the Groth16 proof
     /// @param _pB Second component of the Groth16 proof
     /// @param _pC Third component of the Groth16 proof
-    /// @param _pubSignals Public signals: [commitment, isCorrect, guess, maxNumber]
+    /// @param _pubSignals Public signals: [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
     /// @dev Creator proves knowledge of secret without revealing it.
     ///      isCorrect=1 means guess matches secret (puzzle solved, guesser wins).
     ///      isCorrect=0 means wrong guess (guesser gets stake back).
+    ///      puzzleId and guesser are bound into the proof to prevent cross-puzzle replay
+    ///      and front-running of leaked proofs respectively.
     function respondToChallenge(
         uint256 puzzleId,
         uint256 challengeId,
         uint256[2] calldata _pA,
         uint256[2][2] calldata _pB,
         uint256[2] calldata _pC,
-        uint256[4] calldata _pubSignals
+        uint256[6] calldata _pubSignals
     ) external;
 
     /// @notice Cancel a puzzle and reclaim bounty + collateral

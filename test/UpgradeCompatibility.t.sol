@@ -6,18 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import "../src/GuessGame.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "./mocks/OldGuessGame.sol";
-
-/// @title MockVerifier
-/// @notice Mock verifier for testing - always returns true
-contract MockVerifier {
-    function verifyProof(uint256[2] calldata, uint256[2][2] calldata, uint256[2] calldata, uint256[4] calldata)
-        external
-        pure
-        returns (bool)
-    {
-        return true;
-    }
-}
+import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 /// @title UpgradeCompatibilityTest
 /// @notice Tests upgrade from OldGuessGame (commit e6bc579) to new GuessGame
@@ -25,7 +14,7 @@ contract MockVerifier {
 contract UpgradeCompatibilityTest is Test {
     OldGuessGame public oldImpl;
     GuessGame public newImpl;
-    MockVerifier public verifier;
+    AlwaysAcceptVerifier public verifier;
     ERC1967Proxy public proxy;
 
     address owner;
@@ -43,7 +32,7 @@ contract UpgradeCompatibilityTest is Test {
         vm.deal(guesser, 10 ether);
 
         // Deploy mock verifier
-        verifier = new MockVerifier();
+        verifier = new AlwaysAcceptVerifier();
 
         // Deploy OLD implementation via proxy
         oldImpl = new OldGuessGame();
@@ -152,11 +141,11 @@ contract UpgradeCompatibilityTest is Test {
         uint256 guesserBalanceBefore = guesser.balance;
 
         // Respond with correct guess (mock verifier returns true)
-        // pubSignals: [commitment, isCorrect=1, guess=42, maxNumber=100]
+        // pubSignals: [commitment, isCorrect=1, guess=42, maxNumber=100, puzzleId, guesser]
         uint256[2] memory pA = [uint256(1), uint256(1)];
         uint256[2][2] memory pB = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
         uint256[2] memory pC = [uint256(1), uint256(1)];
-        uint256[4] memory pubSignals = [uint256(uint256(commitment)), 1, 42, 100];
+        uint256[6] memory pubSignals = [uint256(uint256(commitment)), 1, 42, 100, puzzleId, uint256(uint160(guesser))];
 
         vm.prank(creator);
         newGame.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);
@@ -244,7 +233,7 @@ contract UpgradeCompatibilityTest is Test {
         uint256[2] memory pA = [uint256(1), uint256(1)];
         uint256[2][2] memory pB = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
         uint256[2] memory pC = [uint256(1), uint256(1)];
-        uint256[4] memory pubSignals = [uint256(uint256(commitment)), 0, 50, 100]; // isCorrect = 0
+        uint256[6] memory pubSignals = [uint256(uint256(commitment)), 0, 50, 100, puzzleId, uint256(uint160(guesser))]; // isCorrect = 0
 
         vm.prank(creator);
         newGame.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);
@@ -284,7 +273,7 @@ contract UpgradeCompatibilityTest is Test {
         uint256[2] memory pA = [uint256(1), uint256(1)];
         uint256[2][2] memory pB = [[uint256(1), uint256(1)], [uint256(1), uint256(1)]];
         uint256[2] memory pC = [uint256(1), uint256(1)];
-        uint256[4] memory pubSignals = [uint256(uint256(commitment)), 0, 50, 100];
+        uint256[6] memory pubSignals = [uint256(uint256(commitment)), 0, 50, 100, puzzleId, uint256(uint160(guesser))];
 
         vm.prank(creator);
         newGame.respondToChallenge(puzzleId, challengeId, pA, pB, pC, pubSignals);

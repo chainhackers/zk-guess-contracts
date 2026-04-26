@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "../../src/interfaces/IGroth16Verifier.sol";
+import "./IGroth16VerifierV1.sol";
 
 /// @title OldGuessGame
 /// @notice Old version of GuessGame from commit e6bc579 for upgrade testing
@@ -83,7 +83,7 @@ contract OldGuessGame is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     error InvalidGuessRange();
     error InvalidMaxNumber();
 
-    IGroth16Verifier public verifier;
+    IGroth16VerifierV1 public verifier;
     address public treasury;
     uint256 public puzzleCount;
 
@@ -115,7 +115,7 @@ contract OldGuessGame is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         __Ownable_init(_owner);
 
         if (_verifier == address(0)) revert InvalidVerifierAddress();
-        verifier = IGroth16Verifier(_verifier);
+        verifier = IGroth16VerifierV1(_verifier);
         treasury = _treasury;
     }
 
