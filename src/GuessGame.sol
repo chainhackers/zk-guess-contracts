@@ -121,12 +121,16 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
 
-        if (_treasury == address(0)) revert InvalidTreasuryAddress();
+        // Reject EOAs and self-destructed contracts here so the funding-gate invariant is
+        // enforced at deploy time — every wire from GuessGame into the rewards pool must
+        // hit a contract with `fundRewards(string)`. Doesn't prove the target is actually
+        // a Rewards instance, but eliminates the silent-EOA failure mode.
+        if (_treasury == address(0) || _treasury.code.length == 0) revert InvalidTreasuryAddress();
         treasury = _treasury;
 
         emit ProjectMetadata(
             "https://zk-guess.chainhackers.xyz",
-            "https://github.com/chainhackers/zk-guess-circuits",
+            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0",
             "", // vkeyChecksum: filled in after the phase-2 ceremony produces guess_final.zkey
             "" // auditUrl: filled in after first published audit
         );
@@ -340,9 +344,16 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         // Route slashed collateral through the labeled funding path so every inbound transfer
         // to the rewards pool carries a scanner-readable purpose (anti-mixer hardening).
+        // try/catch keeps the failure mode aligned with the rest of the contract: any treasury
+        // misconfiguration surfaces as TransferFailed, not a foreign callee revert.
         if (puzzle.collateral > 0) {
             emit CollateralSlashed(puzzleId, puzzle.collateral);
-            Rewards(payable(treasury)).fundRewards{value: puzzle.collateral}("forfeit-collateral-routing");
+            try Rewards(payable(treasury)).fundRewards{value: puzzle.collateral}("forfeit-collateral-routing") {
+            // no-op
+            }
+            catch {
+                revert TransferFailed();
+            }
         }
     }
 
@@ -433,7 +444,12 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         emit StaleBountySwept(puzzleId, unclaimed);
 
-        Rewards(payable(treasury)).fundRewards{value: unclaimed}("stale-bounty-sweep");
+        try Rewards(payable(treasury)).fundRewards{value: unclaimed}("stale-bounty-sweep") {
+        // no-op
+        }
+        catch {
+            revert TransferFailed();
+        }
     }
 
     /// @inheritdoc IGuessGame

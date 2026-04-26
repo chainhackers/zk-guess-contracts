@@ -765,8 +765,10 @@ contract GuessGameTest is Test {
 
     function test_ForfeitRevertsIfTreasuryRejects() public {
         // Deploy game with a misconfigured (non-Rewards) treasury to confirm the labeled
-        // funding path bubbles up the revert. In production the treasury is a Rewards
-        // contract; this is a defense against initializer misconfiguration.
+        // funding path surfaces a clean TransferFailed rather than a foreign callee revert.
+        // In production the treasury is a Rewards contract; this is a defense against
+        // initializer misconfiguration. The try/catch in forfeitPuzzle normalizes the
+        // error to TransferFailed regardless of why fundRewards failed.
         RejectingReceiver badTreasury = new RejectingReceiver();
         GuessGame gameWithBadTreasury = deployGameProxy(address(verifier), address(badTreasury));
 
@@ -779,9 +781,7 @@ contract GuessGameTest is Test {
 
         vm.warp(block.timestamp + gameWithBadTreasury.RESPONSE_TIMEOUT() + 1);
 
-        // Bare expectRevert — RejectingReceiver has no `fundRewards`; the missing-selector
-        // revert from the typed external call has no data to match a specific error.
-        vm.expectRevert();
+        vm.expectRevert(IGuessGame.TransferFailed.selector);
         vm.prank(anyone);
         gameWithBadTreasury.forfeitPuzzle(puzzleId, challengeId);
     }

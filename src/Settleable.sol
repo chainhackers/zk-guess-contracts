@@ -26,8 +26,9 @@ abstract contract Settleable is ISettleable, OwnableUpgradeable {
         uint256 length = _potentiallyOwedLength();
         if (cursor >= length) revert CursorBeyondQueue();
 
-        uint256 end = cursor + n;
-        if (end > length) end = length;
+        // Clamp before adding so an oversized n (e.g. type(uint256).max) doesn't overflow.
+        uint256 remaining = length - cursor;
+        uint256 end = n >= remaining ? length : cursor + n;
 
         uint256 totalDistributed;
         for (uint256 i = cursor; i < end; i++) {
