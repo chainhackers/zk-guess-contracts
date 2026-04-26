@@ -25,7 +25,7 @@ A file-by-file review of the current contract confirms the protocol is **already
 ## Non-goals
 
 - **Safe multisig on owner.** The operator wallet stays an EOA for v2; multisig is Phase G follow-up. Adding it now stretches the timeline and the current owner surface (`pause`, `publishRoot`, `settleNext`) doesn't justify multisig friction.
-- **Upgradeability of the new deployment.** The current `GuessGame` is UUPS; we keep that. We are NOT migrating the existing UUPS proxy — clean redeploy means new proxy + new impl + new verifier. Settling the v1 proxy and pointing the frontend at v2 is the cutover.
+- **Upgrading the v1 deployment in place.** v2 stays UUPS-upgradeable, but we are NOT reusing the v1 proxy. Clean redeploy means a brand-new proxy + impl + verifier; settling the v1 proxy and pointing the frontend at the new addresses is the cutover (see §"Why a redeploy and not an upgrade" below).
 - **External audit of the rewrite.** Tracked as Phase G; landing one is a strong legitimacy marker but not a blocker for v2.
 - **Designing the off-chain rewards rules engine.** Done in `chainhackers/zk-guess-rewards` and `scripts/rewards/compute-epoch.ts`; orthogonal to this redeploy.
 - **Changing the proof system.** Still Groth16 over BN254; only the circuit's public inputs and one constant change.
@@ -54,7 +54,7 @@ Every piece of advice from the brainstorming session, with how it's addressed in
 | 7 | Bytecode mixer topology unavoidable with Groth16 + ETH | Acknowledged — compensated by structural differentiators | This doc |
 | 8 | Recipient never user-supplied | Already true (only `msg.sender` or state-derived) | Verified |
 | 9 | No admin function that redirects payouts / no claim-on-behalf | Already true | Verified |
-| 10 | Deposit→payout linked in events | Adopted — `PuzzleSolved` gets `challengeId`; `ForfeitClaimed` gets `amount` | Phase C |
+| 10 | Deposit→payout linked in events | Adopted — `PuzzleSolved` gets indexed `challengeId`. (`ForfeitClaimed` already includes `amount` today at `IGuessGame.sol:96`.) | Phase C4 |
 | 11 | Variable denominations — never add a standard pool | Adopted as standing rule | SECURITY.md |
 | 12 | N-to-1 economics | Already true (many losing stakes → one winner) | Preserved |
 | 13 | Verify both contracts on Basescan with full source + `@notice` | Adopted | Phase C (NatSpec) + Phase D |
@@ -115,7 +115,7 @@ Every piece of advice from the brainstorming session, with how it's addressed in
 
 ## Phase A — Circuit v2 (`chainhackers/zk-guess-circuits`)
 
-**Status: shipped (PR #9 merged on circuits side; contracts PR #41 wires it).**
+**Status: implemented; pending merge.** Circuits PR #9 is merged. Contracts PR #41 wires the new `[6]` public-signal shape into `respondToChallenge` and is open at the time of writing — `main` still carries the v1 `[4]` flow until that PR lands.
 
 Four circuit changes, each on top of v1 (`Poseidon([number, salt])` commitment, public signals `[commitment, isCorrect, guess, maxNumber]`):
 
@@ -174,8 +174,8 @@ Turns the "funds sit indefinitely after forfeit if no one claims" surface into a
 
 ### C4. `GuessGame.sol`: enrich traceability events
 
-- `PuzzleSolved(puzzleId, winner, prize)` → add `challengeId` (indexed): `PuzzleSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address winner, uint256 prize)`.
-- `ForfeitClaimed(puzzleId, guesser)` → add `amount`: `ForfeitClaimed(uint256 indexed puzzleId, address guesser, uint256 amount)`.
+- `PuzzleSolved(puzzleId, winner, prize)` → add indexed `challengeId`: `PuzzleSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address winner, uint256 prize)`.
+- `ForfeitClaimed` already includes `amount` (`event ForfeitClaimed(uint256 indexed puzzleId, address guesser, uint256 amount)` at `IGuessGame.sol:96`); no change needed.
 
 Zero storage cost. Indexer handler updates accordingly.
 
@@ -216,7 +216,7 @@ In `initialize` (or a new `initV2` call), emit one `ProjectMetadata(string homep
 ## Phase D — Deploy, verify, submit
 
 1. **Deploy script update** — `script/Deploy.s.sol` takes `owner` as a parameter (not `msg.sender`). The deployer broadcasts; immediately calls `transferOwnership(operator)` on both contracts in the same script when possible.
-2. **CREATE2 salt** — if `DeployDeterministic.s.sol` is used, pick a salt distinct from v1 (`keccak256("zkguess.v2.2026-04")`).
+2. **CREATE2 salt (optional)** — current deploy flow is `script/Deploy.s.sol` (regular `CREATE`). If we add a deterministic-deployment script in Phase D (e.g., `script/DeployDeterministic.s.sol` — to be created), pick a salt distinct from v1 (`keccak256("zkguess.v2.2026-04")`). Not a hard requirement; vanity addresses are nice-to-have, not mixer-defense.
 3. **Sourcify + Basescan verification** — `scripts/verify-sourcify.sh` and `scripts/verify-basescan.sh` for all four contracts (`GuessGame` impl, proxy, `Rewards`, `GuessVerifier`).
 4. **Basescan nametag** — submit "ZK Guess Game" + `https://zk-guess.chainhackers.xyz` via the Basescan name-tag form for the proxy address.
 5. **Blockaid `verifiedProject`** — submit at `https://report.blockaid.io/verifiedProject`. Body in `docs/security/not-a-mixer.md`. Required: proxy address, domain, chain (Base mainnet), Basescan-verified source link, circuit repo link, the four-point non-mixer explainer, pre-disclosure of the forfeit mechanism, reputation pointers (Farcaster mini-app listing, boost.xyz campaign, user count), and the threat-model URL.
