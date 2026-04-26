@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
 import "../../src/GuessGame.sol";
 import {ProofIO} from "./ProofIO.sol";
 
 /// @notice Demo: respond to guess A on a local-anvil deployment.
 /// @dev Reads proof JSON from $PROOF_PATH (default /tmp/proof-a.json) — generate beforehand via:
 ///      `node scripts/generate-proof.js <secret> <salt> <guess> <maxNumber> <puzzleId> <guesser>`.
-contract Step3_RespondToGuessA is Script, ProofIO {
+///      ProofIO already inherits forge-std/Script.sol; no need to inherit Script directly.
+contract Step3_RespondToGuessA is ProofIO {
     function run(address gameAddress, uint256 puzzleId, uint256 challengeId) external {
         GuessGame game = GuessGame(gameAddress);
         (

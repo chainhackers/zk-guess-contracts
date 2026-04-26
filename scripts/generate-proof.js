@@ -19,7 +19,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length !== 6) {
-    console.error("Usage: node generate-proof.js <number> <salt> <guess> <maxNumber> <puzzleId> <guesser>");
+    console.error("Usage: node scripts/generate-proof.js <number> <salt> <guess> <maxNumber> <puzzleId> <guesser>");
     process.exit(1);
   }
 

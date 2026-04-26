@@ -5,8 +5,9 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 
 template GuessNumber() {
     // keccak256("zkguess.v2") mod p(BN254). Domain-separates v2 commitments
-    // from v1 Poseidon(2) commitments and from any future version. Must stay
-    // in sync with DOMAIN_TAG in src/constants.ts.
+    // from v1 Poseidon(2) commitments and from any future version. If this value
+    // is mirrored in application code, update both definitions together so the
+    // circuit and off-chain commitment logic cannot drift.
     var DOMAIN_TAG = 6000605569458108169701754207643449997818461959397281845176039583157698733685;
 
     signal input number;
