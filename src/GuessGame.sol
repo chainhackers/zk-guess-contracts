@@ -344,16 +344,9 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         // Route slashed collateral through the labeled funding path so every inbound transfer
         // to the rewards pool carries a scanner-readable purpose (anti-mixer hardening).
-        // try/catch keeps the failure mode aligned with the rest of the contract: any treasury
-        // misconfiguration surfaces as TransferFailed, not a foreign callee revert.
         if (puzzle.collateral > 0) {
             emit CollateralSlashed(puzzleId, puzzle.collateral);
-            try Rewards(payable(treasury)).fundRewards{value: puzzle.collateral}("forfeit-collateral-routing") {
-            // no-op
-            }
-            catch {
-                revert TransferFailed();
-            }
+            _fundTreasury(puzzle.collateral, "forfeit-collateral-routing");
         }
     }
 
@@ -444,7 +437,16 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         emit StaleBountySwept(puzzleId, unclaimed);
 
-        try Rewards(payable(treasury)).fundRewards{value: unclaimed}("stale-bounty-sweep") {
+        _fundTreasury(unclaimed, "stale-bounty-sweep");
+    }
+
+    /// @dev Internal helper for the two non-settlement outbound paths into Rewards
+    ///      (forfeitPuzzle, sweepStaleBounty). try/catch normalizes any treasury
+    ///      misconfiguration to TransferFailed, matching the rest of the contract's
+    ///      failure vocabulary. The settlement-side route lives in `_routeDustToTreasury`
+    ///      and reverts SettleTransferFailed per the Settleable interface contract.
+    function _fundTreasury(uint256 amount, string memory reason) private {
+        try Rewards(payable(treasury)).fundRewards{value: amount}(reason) {
         // no-op
         }
         catch {
@@ -461,19 +463,22 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         for (uint256 i; i < n; i++) {
             Puzzle storage p = puzzles[i];
             if (!p.solved && !p.cancelled && !p.forfeited) return false;
-            if (p.forfeited) {
-                // forfeitedAt == 0 is treated as not-yet-elapsed (defensive against any path
-                // that flips `forfeited = true` without setting the timestamp).
-                if (p.forfeitedAt == 0 || block.timestamp < p.forfeitedAt + CLAIM_TIMEOUT) return false;
-                // Forfeited bounty accounting must be frozen before settlement — otherwise
-                // claimFromForfeited (still callable while paused) could shift _computeOwed
-                // between settleNext batches and leak non-trivial bounty into settleAll's
-                // dust sweep. Frozen means: every guesser claimed (challengesClaimed ==
-                // pendingAtForfeit) or sweepStaleBounty was called (which sets the same).
-                if (p.challengesClaimed != p.pendingAtForfeit) return false;
-            }
+            if (p.forfeited && !_isForfeitFinalized(p)) return false;
         }
         return true;
+    }
+
+    /// @dev A forfeited puzzle is "finalized" once the claim window has elapsed AND its
+    ///      bounty accounting is frozen — `challengesClaimed == pendingAtForfeit` holds
+    ///      either when every guesser claimed (the cumulative-divisor in claimFromForfeited
+    ///      sets it) or when sweepStaleBounty was called (which also sets the equality and
+    ///      zeros the bounty). Without that guarantee, claimFromForfeited (still callable
+    ///      while paused) could shift _computeOwed between settleNext batches and leak
+    ///      non-trivial bounty into settleAll's dust sweep.
+    function _isForfeitFinalized(Puzzle storage p) private view returns (bool) {
+        if (p.forfeitedAt == 0) return false; // defensive sentinel
+        if (block.timestamp < p.forfeitedAt + CLAIM_TIMEOUT) return false;
+        return p.challengesClaimed == p.pendingAtForfeit;
     }
 
     /// @notice Number of addresses queued for settlement (auto-registered on first interaction)

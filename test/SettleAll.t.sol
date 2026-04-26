@@ -271,8 +271,7 @@ contract SettleAllTest is Test {
         uint256[] memory stakes = new uint256[](3);
         stakes[0] = stakes[1] = stakes[2] = 0.001 ether;
 
-        uint256 puzzleId = _forfeitedPaused(guessers, stakes, 0.0001 ether);
-        puzzleId; // silence unused
+        _forfeitedPaused(guessers, stakes, 0.0001 ether);
 
         // _forfeitedPaused already swept the unclaimed bounty to treasury.
         assertEq(address(treasury).balance, 0.0001 ether, "bounty swept to treasury before pause");
