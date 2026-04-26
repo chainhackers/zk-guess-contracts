@@ -13,6 +13,12 @@ import "./interfaces/ISettleable.sol";
 ///      a `_canSettle()` precondition (e.g. paused + every puzzle terminal + claim windows
 ///      elapsed), and `_routeDustToTreasury` for the final-settlement rounding sweep.
 abstract contract Settleable is ISettleable, OwnableUpgradeable {
+    /// @notice Upper bound on the residual contract balance that settleAll is allowed to
+    ///         sweep to the treasury as "dust". Sized to absorb realistic integer-division
+    ///         rounding (a few thousand wei across all forfeited puzzles); anything larger
+    ///         indicates an accounting bug or a stale precondition and aborts the finalize.
+    uint256 public constant MAX_DUST = 10000;
+
     /// @notice Pay the next `n` addresses in the settlement queue, in order
     /// @param n Maximum number of queue entries to advance through
     /// @param reason Human-readable explanation emitted on the SettledBatch event
@@ -63,6 +69,12 @@ abstract contract Settleable is ISettleable, OwnableUpgradeable {
         _setSettled();
 
         uint256 dust = address(this).balance;
+        // Cap the sweep at MAX_DUST. With _canSettle()'s frozen-accounting precondition,
+        // the post-settleNext balance should only contain integer-division rounding from
+        // claimFromForfeited's cumulative-divisor algorithm — at most a few thousand wei.
+        // A larger remainder signals an accounting bug, so revert rather than silently
+        // routing significant user funds to the treasury.
+        if (dust > MAX_DUST) revert ExcessiveDust(dust);
         if (dust > 0) {
             _routeDustToTreasury(dust, "final-settlement-dust");
         }

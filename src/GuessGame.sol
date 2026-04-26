@@ -461,7 +461,17 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         for (uint256 i; i < n; i++) {
             Puzzle storage p = puzzles[i];
             if (!p.solved && !p.cancelled && !p.forfeited) return false;
-            if (p.forfeited && block.timestamp < p.forfeitedAt + CLAIM_TIMEOUT) return false;
+            if (p.forfeited) {
+                // forfeitedAt == 0 is treated as not-yet-elapsed (defensive against any path
+                // that flips `forfeited = true` without setting the timestamp).
+                if (p.forfeitedAt == 0 || block.timestamp < p.forfeitedAt + CLAIM_TIMEOUT) return false;
+                // Forfeited bounty accounting must be frozen before settlement — otherwise
+                // claimFromForfeited (still callable while paused) could shift _computeOwed
+                // between settleNext batches and leak non-trivial bounty into settleAll's
+                // dust sweep. Frozen means: every guesser claimed (challengesClaimed ==
+                // pendingAtForfeit) or sweepStaleBounty was called (which sets the same).
+                if (p.challengesClaimed != p.pendingAtForfeit) return false;
+            }
         }
         return true;
     }
@@ -509,7 +519,14 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
     /// @inheritdoc Settleable
     function _routeDustToTreasury(uint256 amount, string memory reason) internal override {
-        Rewards(payable(treasury)).fundRewards{value: amount}(reason);
+        // try/catch normalizes treasury misconfiguration to SettleTransferFailed, matching
+        // the failure mode of the other outbound paths (forfeitPuzzle, sweepStaleBounty).
+        try Rewards(payable(treasury)).fundRewards{value: amount}(reason) {
+        // no-op
+        }
+        catch {
+            revert SettleTransferFailed();
+        }
     }
 
     function _isSettled() internal view override returns (bool) {

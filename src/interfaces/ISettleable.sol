@@ -39,6 +39,11 @@ interface ISettleable {
     /// @notice Thrown when settleAll is called before the cursor reaches the end of the queue
     error CursorBehindQueue();
 
+    /// @notice Thrown when settleAll's dust sweep exceeds MAX_DUST
+    /// @dev Defense-in-depth: with the canSettle precondition the residual balance is
+    ///      bounded by integer-division rounding; anything larger signals an accounting bug.
+    error ExcessiveDust(uint256 amount);
+
     /// @notice Whether the contract has been permanently settled
     function settled() external view returns (bool);
 

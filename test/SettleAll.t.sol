@@ -91,6 +91,10 @@ contract SettleAllTest is Test {
 
         vm.warp(block.timestamp + game.CLAIM_TIMEOUT() + 1);
 
+        // Freeze forfeit accounting via sweep — required by canSettle for forfeited puzzles.
+        // (Equivalently every guesser could call claimFromForfeited; sweep is one-call.)
+        game.sweepStaleBounty(puzzleId);
+
         vm.prank(owner);
         game.pause();
     }
@@ -99,8 +103,7 @@ contract SettleAllTest is Test {
 
     function test_canSettle_falseWhenNotPaused() public {
         _solvedAndPaused();
-        vm.prank(owner); // unpause path doesn't exist; but un-paused state is the default until pause()
-        // Recreate scenario without pause
+        // Recreate scenario without pause; un-paused state is the default until pause()
         GuessGame fresh = _freshGame();
         vm.prank(creator);
         fresh.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
@@ -133,6 +136,13 @@ contract SettleAllTest is Test {
         assertEq(fresh.canSettle(), false);
 
         vm.warp(block.timestamp + fresh.CLAIM_TIMEOUT() + 1);
+
+        // Window elapsed but accounting still mutable (challengesClaimed == 0 < pendingAtForfeit == 1)
+        assertEq(fresh.canSettle(), false, "canSettle must be false until forfeit accounting is frozen");
+
+        // Freeze accounting via sweepStaleBounty (sets challengesClaimed = pendingAtForfeit).
+        // Could also call claimFromForfeited from every guesser; sweep is the simpler path here.
+        fresh.sweepStaleBounty(puzzleId);
         assertEq(fresh.canSettle(), true);
     }
 
@@ -248,8 +258,9 @@ contract SettleAllTest is Test {
         assertEq(game.owner(), address(0));
     }
 
-    function test_settleAll_dustRoutedToTreasuryViaFundRewards() public {
-        // Forfeit a puzzle with bounty not divisible by guesser count -> dust accumulates
+    function test_settleAll_endToEndForfeitFlowDrainsContract() public {
+        // End-to-end forfeit-path settlement: forfeit → sweep (freezes accounting) →
+        // settleNext (pays stakes) → settleAll (finalizes; dust must be ≤ MAX_DUST).
         address[] memory guessers = new address[](3);
         guessers[0] = makeAddr("g1");
         guessers[1] = makeAddr("g2");
@@ -261,33 +272,26 @@ contract SettleAllTest is Test {
         stakes[0] = stakes[1] = stakes[2] = 0.001 ether;
 
         uint256 puzzleId = _forfeitedPaused(guessers, stakes, 0.0001 ether);
+        puzzleId; // silence unused
 
-        // Treasury starts at 0 (collateral was 0 since bounty == msg.value)
-        uint256 collateralIntoTreasury = address(treasury).balance;
-        assertEq(collateralIntoTreasury, 0);
+        // _forfeitedPaused already swept the unclaimed bounty to treasury.
+        assertEq(address(treasury).balance, 0.0001 ether, "bounty swept to treasury before pause");
+        // Stakes (3 * 0.001 = 0.003 ether) remain on the contract until settleNext.
+        assertEq(address(proxy).balance, 0.003 ether, "only stakes remain post-sweep");
 
-        // Drain the queue (no claims happened => the entire bounty + stakes sit on contract)
         uint256 total = game.potentiallyOwedCount();
         vm.prank(owner);
         game.settleNext(total, "drain");
-        total; // silence unused
 
-        // Any rounding dust + the unclaimed forfeit bounty share gets swept
-        uint256 contractBalanceBeforeFinal = address(proxy).balance;
-        emit log_named_uint("contract balance before settleAll", contractBalanceBeforeFinal);
+        // settleNext paid stakes back to guessers.
+        assertEq(address(proxy).balance, 0, "stakes paid out");
 
         vm.prank(owner);
         game.settleAll("final");
 
-        assertEq(address(proxy).balance, 0);
-        // Treasury received the dust through fundRewards (label: "final-settlement-dust").
-        // This is asserted via balance increase since RewardsFunded is on the Rewards contract
-        // not on the proxy — we trust the path because the only outbound from settleAll is
-        // _routeDustToTreasury -> Rewards.fundRewards.
-        if (contractBalanceBeforeFinal > 0) {
-            assertGe(address(treasury).balance, contractBalanceBeforeFinal);
-        }
-        puzzleId; // silence unused
+        assertEq(address(proxy).balance, 0, "fully drained - no residual");
+        // Treasury still holds the original swept bounty; settleAll's dust sweep was 0.
+        assertEq(address(treasury).balance, 0.0001 ether);
     }
 
     function test_settleAll_emitsSettled() public {
