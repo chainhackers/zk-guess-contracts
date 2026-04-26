@@ -14,8 +14,7 @@ import {RevertingVerifier} from "./mocks/RevertingVerifier.sol";
 ///         human reviewer skimming `forge test --match-contract NotAMixer` — can
 ///         immediately read.
 ///
-/// The five sections (A–E) correspond to the comparison table in
-/// `docs/superpowers/specs/2026-04-23-clean-redeploy-antimixer-design.md` and to
+/// The five sections (A–E) correspond to the comparison structure and to
 /// the design table at the top of this file. Each test names a property that
 /// would pass on a Tornado-class mixer and fail here.
 contract NotAMixer is Test {
