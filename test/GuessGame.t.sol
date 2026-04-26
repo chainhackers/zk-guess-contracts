@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import {Rewards} from "../src/Rewards.sol";
 import "../src/generated/GuessVerifier.sol";
 
 contract GuessGameTest is Test {
@@ -21,7 +22,7 @@ contract GuessGameTest is Test {
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
         anyone = makeAddr("anyone");
-        treasury = makeAddr("treasury");
+        treasury = address(new Rewards(address(this)));
 
         vm.deal(creator, 10 ether);
         vm.deal(guesser, 10 ether);
@@ -763,7 +764,9 @@ contract GuessGameTest is Test {
     }
 
     function test_ForfeitRevertsIfTreasuryRejects() public {
-        // Deploy game with reverting treasury
+        // Deploy game with a misconfigured (non-Rewards) treasury to confirm the labeled
+        // funding path bubbles up the revert. In production the treasury is a Rewards
+        // contract; this is a defense against initializer misconfiguration.
         RejectingReceiver badTreasury = new RejectingReceiver();
         GuessGame gameWithBadTreasury = deployGameProxy(address(verifier), address(badTreasury));
 
@@ -776,7 +779,9 @@ contract GuessGameTest is Test {
 
         vm.warp(block.timestamp + gameWithBadTreasury.RESPONSE_TIMEOUT() + 1);
 
-        vm.expectRevert(IGuessGame.TransferFailed.selector);
+        // Bare expectRevert — RejectingReceiver has no `fundRewards`; the missing-selector
+        // revert from the typed external call has no data to match a specific error.
+        vm.expectRevert();
         vm.prank(anyone);
         gameWithBadTreasury.forfeitPuzzle(puzzleId, challengeId);
     }

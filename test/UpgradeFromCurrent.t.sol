@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import {Rewards} from "../src/Rewards.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "./mocks/CurrentGuessGame.sol";
 import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
@@ -34,7 +35,7 @@ contract UpgradeFromCurrentTest is Test {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
-        treasury = makeAddr("treasury");
+        treasury = address(new Rewards(address(this)));
 
         vm.deal(creator, 10 ether);
         vm.deal(guesser, 10 ether);

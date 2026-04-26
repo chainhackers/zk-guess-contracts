@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../src/GuessGame.sol";
+import {Rewards} from "../../src/Rewards.sol";
 import "../../src/generated/GuessVerifier.sol";
 import "./GuessGameHandler.sol";
 
@@ -25,7 +26,7 @@ contract GuessGameInvariants is Test {
     function setUp() public {
         // Deploy contracts
         verifier = new Groth16Verifier();
-        treasury = makeAddr("treasury");
+        treasury = address(new Rewards(address(this)));
         game = deployGameProxy(address(verifier), treasury);
         handler = new GuessGameHandler(game, verifier, treasury);
 

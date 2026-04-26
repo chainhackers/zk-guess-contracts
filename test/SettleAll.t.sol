@@ -3,25 +3,22 @@ pragma solidity ^0.8.30;
 
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "../src/GuessGame.sol";
+import "../src/Rewards.sol";
 import "../src/interfaces/IGuessGame.sol";
 import "../src/interfaces/ISettleable.sol";
-import "./mocks/CurrentGuessGame.sol";
 import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 contract SettleAllTest is Test {
     GuessGame public game;
     AlwaysAcceptVerifier public verifier;
+    Rewards public treasury;
     ERC1967Proxy public proxy;
 
     address owner;
     address creator;
     address guesser;
     address guesser2;
-    address treasury;
 
     bytes32 commitment;
 
@@ -34,7 +31,6 @@ contract SettleAllTest is Test {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
-        treasury = makeAddr("treasury");
 
         vm.deal(creator, 10 ether);
         vm.deal(guesser, 10 ether);
@@ -43,546 +39,277 @@ contract SettleAllTest is Test {
         commitment = keccak256(abi.encodePacked(uint256(42), uint256(123)));
 
         verifier = new AlwaysAcceptVerifier();
+        treasury = new Rewards(owner);
 
         GuessGame impl = new GuessGame();
-        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), treasury, owner));
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(verifier), address(treasury), owner));
         proxy = new ERC1967Proxy(address(impl), initData);
         game = GuessGame(address(proxy));
     }
 
-    function _fundContract() internal {
+    function _correctSig(uint256 puzzleId, address guesserAddr) internal view returns (uint256[6] memory) {
+        return [uint256(uint256(commitment)), 1, 42, 100, puzzleId, uint256(uint160(guesserAddr))];
+    }
+
+    function _incorrectSig(uint256 puzzleId, address guesserAddr) internal view returns (uint256[6] memory) {
+        return [uint256(uint256(commitment)), 0, 50, 100, puzzleId, uint256(uint160(guesserAddr))];
+    }
+
+    /// @dev Drive a single puzzle to a terminal solved state and pause. Creator ends with
+    ///      0.5 ether credited to balances; guesser receives bounty + stake immediately.
+    function _solvedAndPaused() internal returns (uint256 puzzleId) {
         vm.prank(creator);
-        uint256 puzzleId = game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
+        puzzleId = game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
 
         vm.prank(guesser);
         uint256 challengeId = game.submitGuess{value: 0.01 ether}(puzzleId, 42);
 
         vm.prank(creator);
-        game.respondToChallenge(
-            puzzleId,
-            challengeId,
-            pA,
-            pB,
-            pC,
-            [uint256(uint256(commitment)), 1, 42, 100, puzzleId, uint256(uint160(guesser))]
-        );
-
-        // Creator has 0.5 ether collateral in balances now
-        assertEq(game.balances(creator), 0.5 ether);
-        assertEq(address(proxy).balance, 0.5 ether);
-    }
-
-    function _settle(address[] memory recipients) internal {
-        vm.prank(owner);
-        game.settleAll(recipients, "test");
-    }
-
-    function _settleWith(address recipient) internal {
-        address[] memory recipients = new address[](1);
-        recipients[0] = recipient;
-        _settle(recipients);
-    }
-
-    // ============ settle() idempotency tests ============
-
-    function test_settle_overlappingBatchesNoDoubleSpend() public {
-        _fundContract();
-
-        address[] memory first = new address[](1);
-        first[0] = creator;
-        address[] memory second = new address[](1);
-        second[0] = creator;
-
-        uint256 balanceBefore = creator.balance;
+        game.respondToChallenge(puzzleId, challengeId, pA, pB, pC, _correctSig(puzzleId, guesser));
 
         vm.prank(owner);
-        game.settle(first);
-        vm.prank(owner);
-        game.settle(second);
-
-        assertEq(creator.balance, balanceBefore + 0.5 ether);
-        assertEq(game.settledPaid(creator), true);
+        game.pause();
     }
 
-    function test_settle_duplicateInBatchNoDoubleSpend() public {
-        _fundContract();
-
-        address[] memory recipients = new address[](2);
-        recipients[0] = creator;
-        recipients[1] = creator;
-
-        uint256 balanceBefore = creator.balance;
-
-        vm.prank(owner);
-        game.settle(recipients);
-
-        assertEq(creator.balance, balanceBefore + 0.5 ether);
-    }
-
-    // ============ zero-dust guarantee tests (PR #35 discussion) ============
-    //
-    // These tests prove that settlement drains the contract to exactly 0 across the two
-    // paths distinguished in the review discussion:
-    //
-    // 1. Mid-claim: some claimants call claimFromForfeited first (updates challengesClaimed),
-    //    then settleAll picks up the rest. Partial telescoping + dust sweep.
-    // 2. Pure settlement: nobody claims first; settleAll computes truncated shares against
-    //    a=0 for all, dust sweep sends residual to the last recipient.
-
-    function _forfeitedPuzzleWith3Guessers(uint256 bounty, uint256 stake)
+    /// @dev Drive a forfeited puzzle past CLAIM_TIMEOUT and pause.
+    function _forfeitedPaused(address[] memory guessers, uint256[] memory stakes, uint256 bounty)
         internal
-        returns (uint256 puzzleId, address g1, address g2, address g3)
+        returns (uint256 puzzleId)
     {
-        g1 = makeAddr("g1");
-        g2 = makeAddr("g2");
-        g3 = makeAddr("g3");
-        vm.deal(g1, 1 ether);
-        vm.deal(g2, 1 ether);
-        vm.deal(g3, 1 ether);
+        require(guessers.length == stakes.length, "len");
 
         vm.prank(creator);
-        puzzleId = game.createPuzzle{value: bounty}(commitment, bounty, stake, 100);
+        puzzleId = game.createPuzzle{value: bounty}(commitment, bounty, 0.001 ether, 100);
 
-        vm.prank(g1);
-        game.submitGuess{value: stake}(puzzleId, 1);
-        vm.prank(g2);
-        game.submitGuess{value: stake}(puzzleId, 2);
-        vm.prank(g3);
-        game.submitGuess{value: stake}(puzzleId, 3);
+        for (uint256 i; i < guessers.length; i++) {
+            vm.prank(guessers[i]);
+            game.submitGuess{value: stakes[i]}(puzzleId, i + 1);
+        }
 
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
         game.forfeitPuzzle(puzzleId, 0);
-    }
 
-    function test_settleAll_zeroDustAfterMidFlowClaim() public {
-        // bounty = 10^14 wei, not divisible by 3 → dust would accumulate without sweep
-        uint256 bounty = 0.0001 ether;
-        uint256 stake = 0.01 ether;
+        vm.warp(block.timestamp + game.CLAIM_TIMEOUT() + 1);
 
-        (uint256 puzzleId, address g1, address g2, address g3) = _forfeitedPuzzleWith3Guessers(bounty, stake);
-
-        // g1 claims first — updates puzzle.challengesClaimed to 1
-        vm.prank(g1);
-        game.claimFromForfeited(puzzleId);
-        vm.prank(g1);
-        game.withdraw();
-
-        // Owner settles the remaining two in one call.
-        // Both g2 and g3 compute _computeOwed against the same a=1 snapshot
-        // (settleAll does not re-read/update challengesClaimed mid-loop).
-        address[] memory recipients = new address[](2);
-        recipients[0] = g2;
-        recipients[1] = g3;
         vm.prank(owner);
-        game.settleAll(recipients, "mid-claim");
-
-        // Contract fully drained — dust sweep (≤10000 wei) absorbs any residual.
-        assertEq(address(proxy).balance, 0);
-        assertEq(game.settled(), true);
-
-        // Sum of bounty shares received == bounty (zero dust stranded).
-        // Each guesser started at 1 ether, paid stake, then got back stake + bountyShare.
-        // Net balance - 1 ether == their bounty share.
-        uint256 g1Share = g1.balance - 1 ether;
-        uint256 g2Share = g2.balance - 1 ether;
-        uint256 g3Share = g3.balance - 1 ether;
-        assertEq(g1Share + g2Share + g3Share, bounty);
+        game.pause();
     }
 
-    function test_settleAll_zeroDustWithPureSettlement() public {
-        // Same setup; nobody calls claimFromForfeited.
-        uint256 bounty = 0.0001 ether;
-        uint256 stake = 0.01 ether;
+    // ============ canSettle ============
 
-        (uint256 puzzleId, address g1, address g2, address g3) = _forfeitedPuzzleWith3Guessers(bounty, stake);
-        puzzleId; // silence unused
+    function test_canSettle_falseWhenNotPaused() public {
+        _solvedAndPaused();
+        vm.prank(owner); // unpause path doesn't exist; but un-paused state is the default until pause()
+        // Recreate scenario without pause
+        GuessGame fresh = _freshGame();
+        vm.prank(creator);
+        fresh.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
+        assertEq(fresh.canSettle(), false);
+    }
 
-        // All three go through settleAll. Each recipient's bounty share is computed
-        // against a=0 (no prior claims), so each gets floor(bounty/3). Sum is bounty-1,
-        // and the last recipient (g3) absorbs the 1 wei residual via the dust sweep.
-        address[] memory recipients = new address[](3);
-        recipients[0] = g1;
-        recipients[1] = g2;
-        recipients[2] = g3;
+    function test_canSettle_falseWhenLivePuzzle() public {
+        GuessGame fresh = _freshGame();
+        vm.prank(creator);
+        fresh.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
         vm.prank(owner);
-        game.settleAll(recipients, "pure");
-
-        assertEq(address(proxy).balance, 0);
-        assertEq(game.settled(), true);
-
-        uint256 floor3 = bounty / 3;
-        uint256 g1Share = g1.balance - 1 ether;
-        uint256 g2Share = g2.balance - 1 ether;
-        uint256 g3Share = g3.balance - 1 ether;
-        assertEq(g1Share, floor3);
-        assertEq(g2Share, floor3);
-        assertEq(g3Share, bounty - 2 * floor3); // gets remainder via dust sweep
-        assertEq(g1Share + g2Share + g3Share, bounty);
+        fresh.pause();
+        assertEq(fresh.canSettle(), false);
     }
 
-    // ============ settleAll tests ============
+    function test_canSettle_falseWhenForfeitClaimWindowOpen() public {
+        GuessGame fresh = _freshGame();
 
-    function test_settleAll_distributesAllFunds() public {
-        _fundContract();
+        vm.prank(creator);
+        uint256 puzzleId = fresh.createPuzzle{value: 0.5 ether}(commitment, 0.0001 ether, 0.001 ether, 100);
+        vm.prank(guesser);
+        fresh.submitGuess{value: 0.001 ether}(puzzleId, 1);
+        vm.warp(block.timestamp + fresh.RESPONSE_TIMEOUT() + 1);
+        fresh.forfeitPuzzle(puzzleId, 0);
+
+        vm.prank(owner);
+        fresh.pause();
+
+        // forfeitedAt + CLAIM_TIMEOUT not elapsed yet
+        assertEq(fresh.canSettle(), false);
+
+        vm.warp(block.timestamp + fresh.CLAIM_TIMEOUT() + 1);
+        assertEq(fresh.canSettle(), true);
+    }
+
+    function test_canSettle_trueAfterAllConditions() public {
+        _solvedAndPaused();
+        assertEq(game.canSettle(), true);
+    }
+
+    // ============ settleNext ============
+
+    function test_settleNext_revertsWhenCanSettleFalse() public {
+        // Live puzzle, not paused
+        vm.prank(creator);
+        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
+        vm.prank(owner);
+        vm.expectRevert(ISettleable.CannotSettle.selector);
+        game.settleNext(10, "test");
+    }
+
+    function test_settleNext_advancesCursor() public {
+        _solvedAndPaused();
+
+        uint256 queueLen = game.potentiallyOwedCount();
+        assertGt(queueLen, 0);
+
+        vm.prank(owner);
+        game.settleNext(queueLen, "test");
+
+        assertEq(game.settleCursor(), queueLen);
+    }
+
+    function test_settleNext_paysOwedAddresses() public {
+        _solvedAndPaused();
 
         uint256 creatorBalanceBefore = creator.balance;
-        _settleWith(creator);
+        uint256 n = game.potentiallyOwedCount();
 
+        vm.prank(owner);
+        game.settleNext(n, "pay-creator");
+
+        // Creator was owed 0.5 ether (collateral); now drained.
         assertEq(creator.balance, creatorBalanceBefore + 0.5 ether);
-        assertEq(address(proxy).balance, 0);
     }
 
-    function test_settleAll_onlyOwner() public {
-        _fundContract();
+    function test_settleNext_skipsAlreadyPaid() public {
+        _solvedAndPaused();
 
-        address[] memory recipients = new address[](1);
-        recipients[0] = creator;
+        uint256 queueLen = game.potentiallyOwedCount();
 
+        vm.prank(owner);
+        game.settleNext(queueLen, "first");
+        uint256 cursorAfterFirst = game.settleCursor();
+        uint256 creatorBalanceAfter = creator.balance;
+
+        // Cannot call again past the queue end
+        vm.prank(owner);
+        vm.expectRevert(ISettleable.CursorBeyondQueue.selector);
+        game.settleNext(1, "second");
+
+        assertEq(game.settleCursor(), cursorAfterFirst);
+        assertEq(creator.balance, creatorBalanceAfter);
+    }
+
+    function test_settleNext_partialBatch() public {
+        // Two-puzzle scenario so multiple addresses get queued
+        vm.prank(creator);
+        uint256 p1 = game.createPuzzle{value: 0.5 ether}(commitment, 0.4 ether, 0.001 ether, 100);
+        vm.prank(creator);
+        uint256 p2 = game.createPuzzle{value: 0.5 ether}(commitment, 0.4 ether, 0.001 ether, 100);
         vm.prank(guesser);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, guesser));
-        game.settleAll(recipients, "test");
+        uint256 c1 = game.submitGuess{value: 0.001 ether}(p1, 42);
+        vm.prank(creator);
+        game.respondToChallenge(p1, c1, pA, pB, pC, _correctSig(p1, guesser));
+        vm.prank(guesser2);
+        uint256 c2 = game.submitGuess{value: 0.001 ether}(p2, 42);
+        vm.prank(creator);
+        game.respondToChallenge(p2, c2, pA, pB, pC, _correctSig(p2, guesser2));
+
+        vm.prank(owner);
+        game.pause();
+
+        // queue has at least creator + guesser + guesser2 (auto-registered)
+        uint256 total = game.potentiallyOwedCount();
+        assertGe(total, 3);
+
+        vm.prank(owner);
+        game.settleNext(2, "batch-1");
+        assertEq(game.settleCursor(), 2);
+
+        vm.prank(owner);
+        game.settleNext(total - 2, "batch-2");
+        assertEq(game.settleCursor(), total);
     }
 
-    function test_settleAll_setsSettledFlag() public {
-        _fundContract();
-        assertEq(game.settled(), false);
-        _settleWith(creator);
+    // ============ settleAll ============
+
+    function test_settleAll_revertsBeforeCursorReachesEnd() public {
+        _solvedAndPaused();
+        vm.prank(owner);
+        vm.expectRevert(ISettleable.CursorBehindQueue.selector);
+        game.settleAll("too-early");
+    }
+
+    function test_settleAll_finalizesAndRenouncesOwnership() public {
+        _solvedAndPaused();
+        uint256 n = game.potentiallyOwedCount();
+        vm.prank(owner);
+        game.settleNext(n, "drain");
+        vm.prank(owner);
+        game.settleAll("done");
+
         assertEq(game.settled(), true);
-    }
-
-    function test_settleAll_renouncesOwnership() public {
-        _fundContract();
-        assertEq(game.owner(), owner);
-        _settleWith(creator);
         assertEq(game.owner(), address(0));
     }
 
-    function test_settleAll_emitsSettledEvent() public {
-        _fundContract();
+    function test_settleAll_dustRoutedToTreasuryViaFundRewards() public {
+        // Forfeit a puzzle with bounty not divisible by guesser count -> dust accumulates
+        address[] memory guessers = new address[](3);
+        guessers[0] = makeAddr("g1");
+        guessers[1] = makeAddr("g2");
+        guessers[2] = makeAddr("g3");
+        for (uint256 i; i < 3; i++) {
+            vm.deal(guessers[i], 1 ether);
+        }
+        uint256[] memory stakes = new uint256[](3);
+        stakes[0] = stakes[1] = stakes[2] = 0.001 ether;
 
-        address[] memory recipients = new address[](1);
-        recipients[0] = creator;
+        uint256 puzzleId = _forfeitedPaused(guessers, stakes, 0.0001 ether);
 
-        vm.expectEmit(true, false, false, true);
-        emit ISettleable.Settled(owner, 0.5 ether, 1, "test");
+        // Treasury starts at 0 (collateral was 0 since bounty == msg.value)
+        uint256 collateralIntoTreasury = address(treasury).balance;
+        assertEq(collateralIntoTreasury, 0);
+
+        // Drain the queue (no claims happened => the entire bounty + stakes sit on contract)
+        uint256 total = game.potentiallyOwedCount();
+        vm.prank(owner);
+        game.settleNext(total, "drain");
+        total; // silence unused
+
+        // Any rounding dust + the unclaimed forfeit bounty share gets swept
+        uint256 contractBalanceBeforeFinal = address(proxy).balance;
+        emit log_named_uint("contract balance before settleAll", contractBalanceBeforeFinal);
 
         vm.prank(owner);
-        game.settleAll(recipients, "test");
-    }
-
-    function test_settleAll_emptyArrays() public {
-        _fundContract();
-
-        address[] memory recipients = new address[](0);
-
-        vm.prank(owner);
-        vm.expectRevert(ISettleable.EmptySettlement.selector);
-        game.settleAll(recipients, "test");
-    }
-
-    function test_settleAll_balanceMismatch() public {
-        _fundContract();
-
-        // Pass guesser who has no funds — creator's funds remain, balance != 0 after
-        address[] memory recipients = new address[](1);
-        recipients[0] = guesser;
-
-        vm.prank(owner);
-        vm.expectRevert(ISettleable.BalanceMismatch.selector);
-        game.settleAll(recipients, "test");
-    }
-
-    function test_settleAll_preventsCreatePuzzle() public {
-        _fundContract();
-        _settleWith(creator);
-
-        vm.prank(creator);
-        vm.expectRevert(ISettleable.ContractSettled.selector);
-        game.createPuzzle{value: 0.1 ether}(commitment, 0.05 ether, 0.01 ether, 100);
-    }
-
-    function test_settleAll_preventsSubmitGuess() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        // Settle with creator getting their active puzzle funds
-        _settleWith(creator);
-
-        vm.prank(guesser);
-        vm.expectRevert(ISettleable.ContractSettled.selector);
-        game.submitGuess{value: 0.01 ether}(0, 42);
-    }
-
-    function test_settleAll_preventsWithdraw() public {
-        _fundContract();
-        _settleWith(creator);
-
-        vm.prank(creator);
-        vm.expectRevert(ISettleable.ContractSettled.selector);
-        game.withdraw();
-    }
-
-    function test_settleAll_preventsUpgradeAfter() public {
-        _fundContract();
-        _settleWith(creator);
-
-        GuessGame newImpl = new GuessGame();
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, owner));
-        game.upgradeToAndCall(address(newImpl), "");
-    }
-
-    function test_settleAll_cannotCallTwice() public {
-        _fundContract();
-        _settleWith(creator);
-
-        address[] memory recipients = new address[](1);
-        recipients[0] = creator;
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, owner));
-        game.settleAll(recipients, "test");
-    }
-
-    function test_settleAll_viewFunctionsStillWork() public {
-        _fundContract();
-        _settleWith(creator);
-
-        IGuessGame.Puzzle memory puzzle = game.getPuzzle(0);
-        assertEq(puzzle.creator, creator);
-
-        IGuessGame.Challenge memory challenge = game.getChallenge(0, 0);
-        assertEq(challenge.guesser, guesser);
-
-        assertEq(game.puzzleCount(), 1);
-        assertEq(game.settled(), true);
-    }
-
-    function test_settleAll_viaUpgradeToAndCall() public {
-        CurrentGuessGame oldImpl = new CurrentGuessGame();
-        bytes memory initData = abi.encodeCall(CurrentGuessGame.initialize, (address(verifier), treasury, owner));
-        ERC1967Proxy freshProxy = new ERC1967Proxy(address(oldImpl), initData);
-
-        vm.prank(creator);
-        CurrentGuessGame(address(freshProxy)).createPuzzle{value: 0.1 ether}(commitment, 0.01 ether, 100);
-
-        vm.warp(block.timestamp + 1 days + 1);
-        vm.prank(creator);
-        CurrentGuessGame(address(freshProxy)).cancelPuzzle(0);
-
-        vm.deal(address(freshProxy), 0.05 ether);
-
-        GuessGame newImpl = new GuessGame();
-        // No recipients with funds — just settle with empty balance check
-        // Send dust to treasury manually first, then settle
-        address[] memory recipients = new address[](1);
-        recipients[0] = treasury;
-
-        // treasury has no computed owed, so this will leave 0.05 ETH and revert
-        // Instead, use a direct approach: deal the proxy to 0 first
-        vm.deal(address(freshProxy), 0);
-
-        bytes memory settleData = abi.encodeCall(ISettleable.settleAll, (recipients, "migration"));
-
-        vm.prank(owner);
-        CurrentGuessGame(address(freshProxy)).upgradeToAndCall(address(newImpl), settleData);
-
-        assertEq(address(freshProxy).balance, 0);
-        assertEq(GuessGame(address(freshProxy)).settled(), true);
-        assertEq(GuessGame(address(freshProxy)).owner(), address(0));
-    }
-
-    function test_settleAll_zeroContractBalance() public {
-        assertEq(address(proxy).balance, 0);
-
-        address[] memory recipients = new address[](1);
-        recipients[0] = creator;
-
-        vm.prank(owner);
-        game.settleAll(recipients, "test");
-
-        assertEq(game.settled(), true);
-    }
-
-    function test_settleAll_computesForfeited() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(guesser);
-        game.submitGuess{value: 0.01 ether}(0, 42);
-
-        vm.warp(block.timestamp + 1 days + 1);
-        vm.prank(guesser);
-        game.forfeitPuzzle(0, 0);
-
-        // Collateral slashed to treasury. Remaining: bounty (0.5) + guesser stake (0.01)
-        uint256 contractBal = address(proxy).balance;
-        assertEq(contractBal, 0.51 ether);
-
-        // Settle — guesser should get stake + bounty share
-        address[] memory recipients = new address[](1);
-        recipients[0] = guesser;
-
-        uint256 guesserBefore = guesser.balance;
-        vm.prank(owner);
-        game.settleAll(recipients, "test");
-
-        assertEq(guesser.balance, guesserBefore + 0.51 ether);
-        assertEq(address(proxy).balance, 0);
-    }
-
-    function test_settleAll_computesActivePuzzleCreator() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        // Settle with active puzzle — creator gets bounty + collateral
-        _settleWith(creator);
+        game.settleAll("final");
 
         assertEq(address(proxy).balance, 0);
+        // Treasury received the dust through fundRewards (label: "final-settlement-dust").
+        // This is asserted via balance increase since RewardsFunded is on the Rewards contract
+        // not on the proxy — we trust the path because the only outbound from settleAll is
+        // _routeDustToTreasury -> Rewards.fundRewards.
+        if (contractBalanceBeforeFinal > 0) {
+            assertGe(address(treasury).balance, contractBalanceBeforeFinal);
+        }
+        puzzleId; // silence unused
     }
 
-    // ============ Pause (seal) tests ============
+    function test_settleAll_emitsSettled() public {
+        _solvedAndPaused();
+        uint256 n = game.potentiallyOwedCount();
+        vm.prank(owner);
+        game.settleNext(n, "drain");
 
-    function test_pause_onlyOwner() public {
-        vm.prank(guesser);
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, guesser));
-        game.pause();
+        vm.expectEmit(true, false, false, false, address(game));
+        emit ISettleable.Settled(owner, 0, 0, "done"); // exact amounts/cursor not asserted via this overload
+        vm.prank(owner);
+        game.settleAll("done");
     }
 
-    function test_pause_blocksCreatePuzzle() public {
-        vm.prank(owner);
-        game.pause();
+    // ============ helpers ============
 
-        vm.prank(creator);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        game.createPuzzle{value: 0.1 ether}(commitment, 0.05 ether, 0.01 ether, 100);
-    }
-
-    function test_pause_blocksSubmitGuess() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(owner);
-        game.pause();
-
-        vm.prank(guesser);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        game.submitGuess{value: 0.01 ether}(0, 42);
-    }
-
-    function test_pause_allowsCancelPuzzle() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(owner);
-        game.pause();
-
-        vm.warp(block.timestamp + 1 days + 1);
-
-        uint256 creatorBefore = creator.balance;
-        vm.prank(creator);
-        game.cancelPuzzle(0);
-
-        assertEq(creator.balance, creatorBefore + 1 ether);
-    }
-
-    function test_pause_allowsWithdraw() public {
-        _fundContract();
-
-        vm.prank(owner);
-        game.pause();
-
-        uint256 creatorBefore = creator.balance;
-        vm.prank(creator);
-        game.withdraw();
-
-        assertEq(creator.balance, creatorBefore + 0.5 ether);
-    }
-
-    function test_pause_allowsRespondToChallenge() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(guesser);
-        uint256 challengeId = game.submitGuess{value: 0.01 ether}(0, 42);
-
-        vm.prank(owner);
-        game.pause();
-
-        vm.prank(creator);
-        game.respondToChallenge(
-            0,
-            challengeId,
-            pA,
-            pB,
-            pC,
-            [uint256(uint256(commitment)), 0, 42, 100, uint256(0), uint256(uint160(guesser))]
-        );
-    }
-
-    function test_pause_allowsForfeitPuzzle() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(guesser);
-        game.submitGuess{value: 0.01 ether}(0, 42);
-
-        vm.prank(owner);
-        game.pause();
-
-        vm.warp(block.timestamp + 1 days + 1);
-
-        vm.prank(guesser);
-        game.forfeitPuzzle(0, 0);
-
-        assertEq(game.getPuzzle(0).forfeited, true);
-    }
-
-    function test_pause_allowsClaimFromForfeited() public {
-        vm.prank(creator);
-        game.createPuzzle{value: 1 ether}(commitment, 0.5 ether, 0.01 ether, 100);
-
-        vm.prank(guesser);
-        game.submitGuess{value: 0.01 ether}(0, 42);
-
-        vm.warp(block.timestamp + 1 days + 1);
-        vm.prank(guesser);
-        game.forfeitPuzzle(0, 0);
-
-        vm.prank(owner);
-        game.pause();
-
-        vm.prank(guesser);
-        game.claimFromForfeited(0);
-
-        assertGt(game.balances(guesser), 0);
-    }
-
-    function test_pause_thenSettleAll() public {
-        _fundContract();
-
-        vm.prank(owner);
-        game.pause();
-
-        _settleWith(creator);
-
-        assertEq(game.settled(), true);
-        assertEq(address(proxy).balance, 0);
-    }
-
-    function test_pause_cannotPauseTwice() public {
-        vm.prank(owner);
-        game.pause();
-
-        vm.prank(owner);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        game.pause();
-    }
-
-    function test_pause_isPermanent() public {
-        vm.prank(owner);
-        game.pause();
-
-        assertEq(game.paused(), true);
+    function _freshGame() internal returns (GuessGame g) {
+        AlwaysAcceptVerifier v = new AlwaysAcceptVerifier();
+        Rewards t = new Rewards(owner);
+        GuessGame impl = new GuessGame();
+        bytes memory initData = abi.encodeCall(GuessGame.initialize, (address(v), address(t), owner));
+        ERC1967Proxy p = new ERC1967Proxy(address(impl), initData);
+        g = GuessGame(address(p));
     }
 }

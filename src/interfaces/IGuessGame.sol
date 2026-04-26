@@ -43,6 +43,9 @@ interface IGuessGame {
         uint256 pendingAtForfeit;
         /// @notice Cumulative challenges claimed from forfeited puzzle (for dust-free bounty division)
         uint256 challengesClaimed;
+        /// @notice Block timestamp at which the puzzle was forfeited
+        /// @dev Anchors the CLAIM_TIMEOUT window for sweepStaleBounty. Zero unless forfeited.
+        uint256 forfeitedAt;
     }
 
     /// @notice Represents a guess challenge submitted by a player
@@ -81,7 +84,9 @@ interface IGuessGame {
     event ChallengeResponded(uint256 indexed puzzleId, uint256 indexed challengeId, bool correct);
 
     /// @notice Emitted when a puzzle is solved by a correct guess
-    event PuzzleSolved(uint256 indexed puzzleId, address winner, uint256 prize);
+    /// @dev `challengeId` is indexed so scanners and the indexer can link the prize transfer
+    ///      back to the originating challenge in one query (anti-mixer traceability).
+    event PuzzleSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address winner, uint256 prize);
 
     /// @notice Emitted when creator cancels their puzzle
     event PuzzleCancelled(uint256 indexed puzzleId);
@@ -100,6 +105,13 @@ interface IGuessGame {
 
     /// @notice Emitted when a user withdraws their accumulated balance
     event Withdrawal(address indexed account, uint256 amount);
+
+    /// @notice Emitted when sweepStaleBounty routes unclaimed forfeit bounty to the rewards pool
+    event StaleBountySwept(uint256 indexed puzzleId, uint256 amount);
+
+    /// @notice Emitted at deploy time so scanners and indexers pick up project metadata without
+    ///         parsing NatSpec. Empty fields are placeholders to be filled later (e.g. auditUrl).
+    event ProjectMetadata(string homepage, string circuitRepo, string vkeyChecksum, string auditUrl);
 
     // ============ Errors ============
 
@@ -142,6 +154,12 @@ interface IGuessGame {
     /// @dev Public signal index 5 must equal uint256(uint160(challenge.guesser)); prevents
     ///      a third party from replaying a leaked proof against a different challenger.
     error InvalidGuesserBinding();
+
+    /// @notice Thrown by sweepStaleBounty when the CLAIM_TIMEOUT window has not elapsed
+    error ClaimWindowOpen();
+
+    /// @notice Thrown by sweepStaleBounty when the puzzle's bounty is fully claimed already
+    error NothingToSweep();
 
     /// @notice Thrown when referencing a non-existent challenge
     error ChallengeNotFound();
@@ -269,11 +287,25 @@ interface IGuessGame {
     /// @notice Withdraw accumulated balance from claims
     function withdraw() external;
 
+    /// @notice Sweep unclaimed bounty from a long-forfeited puzzle into the rewards pool
+    /// @param puzzleId The forfeited puzzle to sweep
+    /// @dev Permissionless. Reverts unless `block.timestamp >= forfeitedAt + CLAIM_TIMEOUT` and
+    ///      the bounty has unclaimed share remaining. Amount routes to treasury via the labeled
+    ///      `Rewards.fundRewards("stale-bounty-sweep")` path.
+    function sweepStaleBounty(uint256 puzzleId) external;
+
     /// @notice Time creator must wait after last challenge before cancelling
     function CANCEL_TIMEOUT() external view returns (uint256);
 
     /// @notice Time creator has to respond to at least one challenge before forfeit is allowed
     function RESPONSE_TIMEOUT() external view returns (uint256);
+
+    /// @notice Time after forfeit before unclaimed bounty can be swept to the rewards pool
+    function CLAIM_TIMEOUT() external view returns (uint256);
+
+    /// @notice True iff the contract is paused, every puzzle is terminal, and every forfeited
+    ///         puzzle has passed its CLAIM_TIMEOUT window. Required precondition for settleNext.
+    function canSettle() external view returns (bool);
 
     /// @notice Minimum bounty required to create a puzzle
     function MIN_BOUNTY() external view returns (uint256);

@@ -6,69 +6,75 @@ import "./interfaces/ISettleable.sol";
 
 /// @title Settleable
 /// @notice Abstract contract for permanently settling all funds and disabling the contract
-/// @dev Stateless — inheritors provide storage via _isSettled/_setSettled, _isPaid/_markPaid,
-///      and _computeOwed. Settlement renounces ownership permanently. Per-address payment
-///      tracking makes partial batches idempotent (safe to retry / overlap).
+/// @dev Settlement walks an inheritor-managed deterministic queue (`_potentiallyOwed`) at the
+///      cursor position the inheritor exposes. Owner cannot single out or omit specific
+///      addresses — the queue is auto-populated by user interactions in the inheritor.
+///      Inheritors implement: queue accessors, settled flag, paid flag, computed-owed,
+///      a `_canSettle()` precondition (e.g. paused + every puzzle terminal + claim windows
+///      elapsed), and `_routeDustToTreasury` for the final-settlement rounding sweep.
 abstract contract Settleable is ISettleable, OwnableUpgradeable {
-    /// @notice Distribute funds to a batch of recipients without finalizing
-    /// @dev Callable multiple times to split settlement across txs (for gas limits).
-    ///      Does not mark settled or renounce ownership. Use settleAll for the final batch.
-    ///      Recipients already paid are silently skipped — overlap/retry is safe.
-    function settle(address[] calldata recipients) external onlyOwner {
+    /// @notice Pay the next `n` addresses in the settlement queue, in order
+    /// @param n Maximum number of queue entries to advance through
+    /// @param reason Human-readable explanation emitted on the SettledBatch event
+    /// @dev Idempotent on already-paid entries (skips them). Skips entries with zero owed
+    ///      so unrelated zero-balance addresses don't bloat batch logs.
+    function settleNext(uint256 n, string calldata reason) external onlyOwner {
         if (_isSettled()) revert ContractSettled();
-        if (recipients.length == 0) revert EmptySettlement();
+        if (!_canSettle()) revert CannotSettle();
+
+        uint256 cursor = _readSettleCursor();
+        uint256 length = _potentiallyOwedLength();
+        if (cursor >= length) revert CursorBeyondQueue();
+
+        uint256 end = cursor + n;
+        if (end > length) end = length;
 
         uint256 totalDistributed;
-        for (uint256 i; i < recipients.length; i++) {
-            address r = recipients[i];
+        for (uint256 i = cursor; i < end; i++) {
+            address r = _potentiallyOwedAt(i);
             if (_isPaid(r)) continue;
             uint256 owed = _computeOwed(r);
             _markPaid(r);
             if (owed > 0) {
                 totalDistributed += owed;
+                emit SettledPaid(r, owed);
                 (bool success,) = r.call{value: owed}("");
                 if (!success) revert SettleTransferFailed();
             }
         }
 
-        emit SettlementBatch(msg.sender, totalDistributed, recipients.length);
+        _writeSettleCursor(end);
+        emit SettledBatch(cursor, end, totalDistributed, reason);
     }
 
-    /// @inheritdoc ISettleable
-    function settleAll(address[] calldata recipients, string calldata reason) external onlyOwner {
+    /// @notice Finalize settlement: sweep rounding dust to treasury, mark settled, renounce ownership
+    /// @param reason Human-readable explanation emitted on the Settled event
+    /// @dev Requires the cursor to have reached the end of the queue. Any residual contract
+    ///      balance is routed through the inheritor's `_routeDustToTreasury` (a labeled
+    ///      `Rewards.fundRewards` call in the GuessGame integration) so even the dust carries
+    ///      a scanner-readable purpose.
+    function settleAll(string calldata reason) external onlyOwner {
         if (_isSettled()) revert ContractSettled();
-        if (recipients.length == 0) revert EmptySettlement();
+        if (!_canSettle()) revert CannotSettle();
+        uint256 cursor = _readSettleCursor();
+        if (cursor < _potentiallyOwedLength()) revert CursorBehindQueue();
 
         _setSettled();
 
-        uint256 totalDistributed;
-        for (uint256 i; i < recipients.length; i++) {
-            address r = recipients[i];
-            if (_isPaid(r)) continue;
-            uint256 owed = _computeOwed(r);
-            _markPaid(r);
-            if (owed > 0) {
-                totalDistributed += owed;
-                (bool success,) = r.call{value: owed}("");
-                if (!success) revert SettleTransferFailed();
-            }
-        }
-
-        // Sweep integer division rounding dust (max 10000 wei — enough for realistic
-        // forfeited-puzzle rounding, small enough to catch misconfigured settlements)
         uint256 dust = address(this).balance;
-        if (dust > 0 && dust <= 10000) {
-            totalDistributed += dust;
-            (bool ok,) = recipients[recipients.length - 1].call{value: dust}("");
-            if (!ok) revert SettleTransferFailed();
+        if (dust > 0) {
+            _routeDustToTreasury(dust, "final-settlement-dust");
         }
 
-        emit Settled(msg.sender, totalDistributed, recipients.length, reason);
         if (address(this).balance != 0) revert BalanceMismatch();
+
+        emit Settled(msg.sender, dust, cursor, reason);
         _transferOwnership(address(0));
     }
 
-    /// @dev Whether the contract has been settled. Implemented by inheritor (storage lives there).
+    // ============ Inheritor hooks ============
+
+    /// @dev Whether the contract has been settled. Implemented by inheritor.
     function _isSettled() internal view virtual returns (bool);
 
     /// @dev Mark the contract as settled. Implemented by inheritor.
@@ -82,4 +88,22 @@ abstract contract Settleable is ISettleable, OwnableUpgradeable {
 
     /// @dev Compute total ETH owed to an address. Implemented by inheritor.
     function _computeOwed(address addr) internal view virtual returns (uint256 owed);
+
+    /// @dev Length of the inheritor's deterministic settlement queue.
+    function _potentiallyOwedLength() internal view virtual returns (uint256);
+
+    /// @dev Address at queue position `i` in the inheritor's queue.
+    function _potentiallyOwedAt(uint256 i) internal view virtual returns (address);
+
+    /// @dev Read the inheritor's settlement cursor.
+    function _readSettleCursor() internal view virtual returns (uint256);
+
+    /// @dev Write the inheritor's settlement cursor (after settleNext advances it).
+    function _writeSettleCursor(uint256 v) internal virtual;
+
+    /// @dev Inheritor-defined precondition (e.g. paused + every terminal puzzle + claim window).
+    function _canSettle() internal view virtual returns (bool);
+
+    /// @dev Route the final dust sweep through the inheritor's labeled treasury path.
+    function _routeDustToTreasury(uint256 amount, string memory reason) internal virtual;
 }
