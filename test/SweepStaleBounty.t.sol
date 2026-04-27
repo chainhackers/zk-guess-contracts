@@ -120,6 +120,42 @@ contract SweepStaleBountyTest is Test {
         assertEq(game.balances(guesser2), g2BalanceBefore + 0.001 ether); // stake only, no bounty
     }
 
+    /// @notice Regression: post-sweep `claimFromForfeited` (stake-only) must NOT mutate
+    ///         `puzzle.challengesClaimed`. Otherwise it would tip past `pendingAtForfeit`
+    ///         and break `canSettle`'s frozen-accounting invariant, permanently blocking
+    ///         settlement (see PR #43 review comment 3144294311).
+    function test_sweep_postSweepClaim_keepsContractSettleable() public {
+        uint256 bountyAmt = 0.0001 ether;
+        uint256 puzzleId = _forfeitedTwoGuessers(bountyAmt);
+
+        IGuessGame.Puzzle memory pBefore = game.getPuzzle(puzzleId);
+        uint256 pendingAtForfeit = pBefore.pendingAtForfeit;
+
+        vm.warp(block.timestamp + game.CLAIM_TIMEOUT() + 1);
+
+        // Sweep first — sets challengesClaimed == pendingAtForfeit, zeros bounty.
+        vm.prank(sweeper);
+        game.sweepStaleBounty(puzzleId);
+
+        IGuessGame.Puzzle memory pAfterSweep = game.getPuzzle(puzzleId);
+        assertEq(pAfterSweep.challengesClaimed, pendingAtForfeit);
+        assertEq(pAfterSweep.bounty, 0);
+
+        // Both guessers claim their stake AFTER the sweep — must not touch challengesClaimed.
+        vm.prank(guesser);
+        game.claimFromForfeited(puzzleId);
+        vm.prank(guesser2);
+        game.claimFromForfeited(puzzleId);
+
+        IGuessGame.Puzzle memory pAfterClaims = game.getPuzzle(puzzleId);
+        assertEq(pAfterClaims.challengesClaimed, pendingAtForfeit, "post-sweep claims must not increment");
+
+        // Pause and confirm the contract is still settleable.
+        vm.prank(owner);
+        game.pause();
+        assertTrue(game.canSettle(), "post-sweep stake claims must not break canSettle");
+    }
+
     function test_sweep_revertsOnNothingToSweep() public {
         uint256 bountyAmt = 0.0001 ether;
         uint256 puzzleId = _forfeitedTwoGuessers(bountyAmt);

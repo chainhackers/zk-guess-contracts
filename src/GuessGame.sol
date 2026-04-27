@@ -364,14 +364,23 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Mark as claimed
         guesserClaimed[puzzleId][msg.sender] = true;
 
-        // Cumulative difference, not (bounty * myChallenges) / pendingAtForfeit, because the
-        // two integer divisions telescope to exactly bounty across all claims, with the last
-        // claimant absorbing the remainder. Do not simplify to the single-division form.
-        uint256 a = puzzle.challengesClaimed;
-        uint256 b = a + myChallenges;
-        puzzle.challengesClaimed = b;
-        uint256 bountyShare =
-            (puzzle.bounty * b) / puzzle.pendingAtForfeit - (puzzle.bounty * a) / puzzle.pendingAtForfeit;
+        uint256 bountyShare;
+        if (puzzle.bounty == 0) {
+            // Post-sweep: bounty was zeroed and challengesClaimed == pendingAtForfeit.
+            // Stake is still claimable indefinitely, but we MUST NOT touch challengesClaimed
+            // (incrementing past pendingAtForfeit would break canSettle's frozen-accounting
+            // invariant and permanently block settlement).
+            bountyShare = 0;
+        } else {
+            // Cumulative difference, not (bounty * myChallenges) / pendingAtForfeit, because
+            // the two integer divisions telescope to exactly bounty across all claims, with
+            // the last claimant absorbing the remainder. Do not simplify to the single-
+            // division form.
+            uint256 a = puzzle.challengesClaimed;
+            uint256 b = a + myChallenges;
+            puzzle.challengesClaimed = b;
+            bountyShare = (puzzle.bounty * b) / puzzle.pendingAtForfeit - (puzzle.bounty * a) / puzzle.pendingAtForfeit;
+        }
         uint256 totalPayout = myStake + bountyShare;
 
         // Credit to internal balance
