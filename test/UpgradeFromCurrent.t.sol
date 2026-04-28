@@ -272,4 +272,37 @@ contract UpgradeFromCurrentTest is Test {
         vm.expectRevert(IGuessGame.InsufficientDeposit.selector);
         newGame.createPuzzle{value: 0.0001 ether}(commitment, 0.001 ether, 0.00001 ether, 100);
     }
+
+    /// @notice Regression: sweepStaleBounty must NOT bypass CLAIM_TIMEOUT for puzzles forfeited
+    ///         under the old contract, where forfeitedAt was never written and stays at 0.
+    function test_sweepStaleBounty_revertsForPreUpgradeForfeitedPuzzle() public {
+        // Create old-style puzzle with zero collateral so the pre-upgrade forfeit can run
+        // without a treasury transfer (CurrentGuessGame uses a bare .call{value:} that would
+        // revert against Rewards' missing receive()).
+        vm.prank(creator);
+        uint256 puzzleId =
+            CurrentGuessGame(address(proxy)).createPuzzle{value: 0.0001 ether}(commitment, 0.01 ether, 100);
+
+        vm.prank(guesser);
+        uint256 challengeId = CurrentGuessGame(address(proxy)).submitGuess{value: 0.01 ether}(puzzleId, 42);
+
+        // Forfeit BEFORE the upgrade — old struct has no forfeitedAt slot, so it stays 0.
+        vm.warp(block.timestamp + 1 days + 1);
+        CurrentGuessGame(address(proxy)).forfeitPuzzle(puzzleId, challengeId);
+
+        GuessGame newGame = _upgrade();
+
+        IGuessGame.Puzzle memory p = newGame.getPuzzle(puzzleId);
+        assertEq(p.forfeited, true);
+        assertEq(p.forfeitedAt, 0, "pre-upgrade forfeit leaves forfeitedAt unset");
+
+        // Even after warping past CLAIM_TIMEOUT, the sweep must revert: without a recorded
+        // forfeit timestamp the contract can't prove the 90-day window has elapsed for the
+        // legacy puzzle. Pre-fix this returned ClaimWindowOpen-false (block.timestamp >> 90 days)
+        // and let the sweep proceed, draining unclaimed bounty before guessers had a chance.
+        vm.warp(block.timestamp + newGame.CLAIM_TIMEOUT() + 1);
+
+        vm.expectRevert(IGuessGame.ClaimWindowOpen.selector);
+        newGame.sweepStaleBounty(puzzleId);
+    }
 }

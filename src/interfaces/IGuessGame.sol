@@ -276,7 +276,14 @@ interface IGuessGame {
 
     /// @notice Claim stake and bounty share from a forfeited puzzle
     /// @param puzzleId The forfeited puzzle
-    /// @dev One claim per guesser. Amount = stake + (bounty / pendingAtForfeit)
+    /// @dev One claim per guesser. Bounty share is distributed proportionally to the guesser's
+    ///      challenge count via a cumulative-divisor algorithm:
+    ///        bountyShare = (bounty * (claimedSoFar + myChallenges)) / pendingAtForfeit
+    ///                      - (bounty * claimedSoFar) / pendingAtForfeit
+    ///      The two integer divisions telescope to exactly `bounty` across all claims, with the
+    ///      last claimant absorbing the rounding remainder. Total payout = stake + bountyShare.
+    ///      After `sweepStaleBounty` the bounty is zeroed and bountyShare collapses to 0; the
+    ///      guesser still receives their stake. Stakes are claimable indefinitely.
     function claimFromForfeited(uint256 puzzleId) external;
 
     /// @notice Claim stake back from a solved puzzle (for non-winners)
@@ -303,8 +310,13 @@ interface IGuessGame {
     /// @notice Time after forfeit before unclaimed bounty can be swept to the rewards pool
     function CLAIM_TIMEOUT() external view returns (uint256);
 
-    /// @notice True iff the contract is paused, every puzzle is terminal, and every forfeited
-    ///         puzzle has passed its CLAIM_TIMEOUT window. Required precondition for settleNext.
+    /// @notice True iff the contract is paused, every puzzle is terminal, every forfeited
+    ///         puzzle has passed its CLAIM_TIMEOUT window, and forfeit accounting is frozen
+    ///         (`challengesClaimed == pendingAtForfeit`, satisfied either by all guessers
+    ///         claiming or by `sweepStaleBounty`). Required precondition for settleNext and
+    ///         settleAll. Pre-upgrade forfeited puzzles (forfeitedAt == 0) never finalize and
+    ///         keep this function returning false — by design, since the pre-upgrade window
+    ///         can't be proven elapsed.
     function canSettle() external view returns (bool);
 
     /// @notice Minimum bounty required to create a puzzle

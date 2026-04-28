@@ -429,6 +429,12 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         Puzzle storage puzzle = puzzles[puzzleId];
         if (puzzle.creator == address(0)) revert PuzzleNotFound();
         if (!puzzle.forfeited) revert PuzzleNotForfeited();
+        // Mirrors the sentinel in `_isForfeitFinalized`: a forfeited puzzle without a recorded
+        // forfeit timestamp must come from a pre-upgrade forfeit (the old struct had no
+        // `forfeitedAt` slot). Without that anchor we can't prove the 90-day window has
+        // elapsed, so refuse the sweep — guessers can still claim their stake indefinitely
+        // via `claimFromForfeited`.
+        if (puzzle.forfeitedAt == 0) revert ClaimWindowOpen();
         if (block.timestamp < puzzle.forfeitedAt + CLAIM_TIMEOUT) revert ClaimWindowOpen();
 
         // Telescoping cumulative division mirrors claimFromForfeited so the same totals
@@ -560,6 +566,13 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     function _computeOwed(address addr) internal view override returns (uint256 owed) {
+        // Defense-in-depth: only credit funds tied to terminal puzzles. canSettle (the
+        // settleNext/settleAll precondition) already requires every puzzle to be solved,
+        // cancelled, or forfeited, so there is no path that legitimately credits creator
+        // funds for an active puzzle here. Solved-puzzle collateral was already pushed to
+        // balances[creator] by respondToChallenge, cancelled-puzzle funds were paid out
+        // directly, and forfeited-puzzle collateral was routed to the treasury — so the
+        // only creator-side residual is the balances[addr] credit captured below.
         owed = balances[addr];
 
         for (uint256 pid; pid < puzzleCount; pid++) {
@@ -580,11 +593,6 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             if (p.solved && !guesserClaimed[pid][addr]) {
                 uint256 myStake = guesserStakeTotal[pid][addr];
                 if (myStake > 0) owed += myStake;
-            }
-
-            // Active puzzle creator funds
-            if (!p.solved && !p.cancelled && !p.forfeited && p.creator == addr) {
-                owed += p.bounty + p.collateral;
             }
         }
     }
