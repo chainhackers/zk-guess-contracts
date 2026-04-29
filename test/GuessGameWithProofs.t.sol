@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import {Rewards} from "../src/Rewards.sol";
 import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 
 // Game-flow tests in this file exercise contract state transitions, not Groth16 math; the
@@ -81,7 +82,7 @@ contract GuessGameWithProofsTest is Test {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
-        treasury = makeAddr("treasury");
+        treasury = address(new Rewards(address(this)));
 
         // Deploy mock verifier (always-accepts) — game-flow tests, not Groth16 round-trip
         verifier = new AlwaysAcceptVerifier();
