@@ -5,6 +5,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./Rewards.sol";
 import "./Settleable.sol";
 import "./interfaces/IGroth16Verifier.sol";
 import "./interfaces/IGuessGame.sol";
@@ -14,7 +16,13 @@ import "./interfaces/IGuessGame.sol";
 /// @dev Implements UUPS upgradeable pattern. Puzzle creators commit to a secret number,
 ///      guessers submit challenges with stakes, creators respond with ZK proofs.
 /// @custom:repository https://github.com/chainhackers/zk-guess-contracts
+/// @custom:circuit-repo https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0
+/// @custom:commitment-domain DOMAIN_TAG=6000605569458108169701754207643449997818461959397281845176039583157698733685 (= keccak256("zkguess.v2") mod p(BN254))
+/// @custom:homepage https://zk-guess.chainhackers.xyz
+/// @custom:security-contact security@chainhackers.xyz
 contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable, Settleable {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @notice External Groth16 verifier contract for ZK proof validation
     IGroth16Verifier public verifier;
 
@@ -24,8 +32,10 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @notice Total number of puzzles ever created (also serves as next puzzle ID)
     uint256 public puzzleCount;
 
-    /// @notice Mapping from puzzle ID to puzzle data
-    mapping(uint256 => Puzzle) public puzzles;
+    /// @notice Mapping from puzzle ID to puzzle data — read via `getPuzzle(puzzleId)`.
+    /// @dev Internal because Solidity's auto-generated getter for a 16-field struct would
+    ///      hit the EVM stack-too-deep limit when ABI-encoding the return tuple.
+    mapping(uint256 => Puzzle) internal puzzles;
 
     /// @notice Mapping from puzzle ID and challenge ID to challenge data
     /// @dev Indexed as puzzleChallenges[puzzleId][challengeId]
@@ -69,8 +79,26 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @notice Time allowed for creator to respond before forfeit becomes possible
     uint256 public constant RESPONSE_TIMEOUT = 1 days;
 
+    /// @notice Time after forfeit before unclaimed bounty becomes sweepable to the rewards pool
+    /// @dev Generous window so guessers have plenty of time to claim. After this, `sweepStaleBounty`
+    ///      converts the unclaimed remainder into a labeled `RewardsFunded` transfer instead of
+    ///      letting it sit indefinitely (anti-mixer hardening: no discretionary indefinite holds).
+    uint256 public constant CLAIM_TIMEOUT = 90 days;
+
+    /// @dev Set of addresses that have ever interacted in a way that could leave funds owed
+    ///      to them at settlement time. Auto-populated on first interaction with createPuzzle,
+    ///      submitGuess, claimFromForfeited, claimStakeFromSolved, or withdraw. Forms the
+    ///      deterministic queue iterated by settleNext — owner cannot single out or omit
+    ///      individual recipients (anti-mixer hardening).
+    EnumerableSet.AddressSet private _potentiallyOwed;
+
+    /// @dev Cursor into _potentiallyOwed for settleNext. Advances monotonically.
+    uint256 private _settleCursor;
+
     /// @dev Reserved storage gap for future upgrades (UUPS pattern)
-    uint256[50] private __gap;
+    /// @dev Reduced from 50 to 47: _potentiallyOwed (2 slots: array + position mapping) and
+    ///      _settleCursor (1 slot) consume 3 of the original gap slots.
+    uint256[47] private __gap;
 
     /// @notice Disables initializers to prevent implementation contract from being initialized
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -83,6 +111,8 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     /// @param _treasury Address to receive slashed collateral on forfeit
     /// @param _owner Address with upgrade authority
     /// @dev Can only be called once via proxy. Sets up OwnableUpgradeable with _owner.
+    ///      Emits ProjectMetadata so indexers and scanners can pick up the project pointers
+    ///      at deploy time without parsing NatSpec.
     function initialize(address _verifier, address _treasury, address _owner) public initializer {
         if (_owner == address(0)) revert InvalidOwnerAddress();
         __Ownable_init(_owner);
@@ -91,8 +121,19 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
 
-        if (_treasury == address(0)) revert InvalidTreasuryAddress();
+        // Reject EOAs and self-destructed contracts here so the funding-gate invariant is
+        // enforced at deploy time — every wire from GuessGame into the rewards pool must
+        // hit a contract with `fundRewards(string)`. Doesn't prove the target is actually
+        // a Rewards instance, but eliminates the silent-EOA failure mode.
+        if (_treasury == address(0) || _treasury.code.length == 0) revert InvalidTreasuryAddress();
         treasury = _treasury;
+
+        emit ProjectMetadata(
+            "https://zk-guess.chainhackers.xyz",
+            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0",
+            "", // vkeyChecksum: filled in after the phase-2 ceremony produces guess_final.zkey
+            "" // auditUrl: filled in after first published audit
+        );
     }
 
     /// @notice Authorizes contract upgrades (UUPS pattern)
@@ -144,8 +185,11 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             lastChallengeTimestamp: block.timestamp,
             lastResponseTime: 0,
             pendingAtForfeit: 0,
-            challengesClaimed: 0
+            challengesClaimed: 0,
+            forfeitedAt: 0
         });
+
+        _potentiallyOwed.add(msg.sender);
 
         emit PuzzleCreated(puzzleId, msg.sender, commitment, bounty, collateral, stakeRequired, maxNumber);
     }
@@ -177,6 +221,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Track per-guesser aggregates
         guesserStakeTotal[puzzleId][msg.sender] += msg.value;
         guesserChallengeCount[puzzleId][msg.sender]++;
+        _potentiallyOwed.add(msg.sender);
 
         puzzleChallenges[puzzleId][challengeId] = Challenge({
             guesser: msg.sender, responded: false, guess: guess, stake: msg.value, timestamp: block.timestamp
@@ -237,7 +282,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
             // Winner gets bounty + their stake back
             uint256 totalPrize = puzzle.bounty + challenge.stake;
-            emit PuzzleSolved(puzzleId, challenge.guesser, totalPrize);
+            emit PuzzleSolved(puzzleId, challengeId, challenge.guesser, totalPrize);
 
             // Return collateral to creator
             balances[puzzle.creator] += puzzle.collateral;
@@ -293,14 +338,15 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Mark puzzle as forfeited
         puzzle.forfeited = true;
         puzzle.pendingAtForfeit = puzzle.pendingChallenges;
+        puzzle.forfeitedAt = block.timestamp;
 
         emit PuzzleForfeited(puzzleId, puzzle.pendingAtForfeit);
 
-        // Slash collateral to treasury (if any)
+        // Route slashed collateral through the labeled funding path so every inbound transfer
+        // to the rewards pool carries a scanner-readable purpose (anti-mixer hardening).
         if (puzzle.collateral > 0) {
             emit CollateralSlashed(puzzleId, puzzle.collateral);
-            (bool success,) = treasury.call{value: puzzle.collateral}("");
-            if (!success) revert TransferFailed();
+            _fundTreasury(puzzle.collateral, "forfeit-collateral-routing");
         }
     }
 
@@ -318,18 +364,28 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         // Mark as claimed
         guesserClaimed[puzzleId][msg.sender] = true;
 
-        // Cumulative difference, not (bounty * myChallenges) / pendingAtForfeit, because the
-        // two integer divisions telescope to exactly bounty across all claims, with the last
-        // claimant absorbing the remainder. Do not simplify to the single-division form.
-        uint256 a = puzzle.challengesClaimed;
-        uint256 b = a + myChallenges;
-        puzzle.challengesClaimed = b;
-        uint256 bountyShare =
-            (puzzle.bounty * b) / puzzle.pendingAtForfeit - (puzzle.bounty * a) / puzzle.pendingAtForfeit;
+        uint256 bountyShare;
+        if (puzzle.bounty == 0) {
+            // Post-sweep: bounty was zeroed and challengesClaimed == pendingAtForfeit.
+            // Stake is still claimable indefinitely, but we MUST NOT touch challengesClaimed
+            // (incrementing past pendingAtForfeit would break canSettle's frozen-accounting
+            // invariant and permanently block settlement).
+            bountyShare = 0;
+        } else {
+            // Cumulative difference, not (bounty * myChallenges) / pendingAtForfeit, because
+            // the two integer divisions telescope to exactly bounty across all claims, with
+            // the last claimant absorbing the remainder. Do not simplify to the single-
+            // division form.
+            uint256 a = puzzle.challengesClaimed;
+            uint256 b = a + myChallenges;
+            puzzle.challengesClaimed = b;
+            bountyShare = (puzzle.bounty * b) / puzzle.pendingAtForfeit - (puzzle.bounty * a) / puzzle.pendingAtForfeit;
+        }
         uint256 totalPayout = myStake + bountyShare;
 
         // Credit to internal balance
         balances[msg.sender] += totalPayout;
+        _potentiallyOwed.add(msg.sender);
 
         emit ForfeitClaimed(puzzleId, msg.sender, totalPayout);
     }
@@ -349,6 +405,7 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         // Credit stake to internal balance
         balances[msg.sender] += myStake;
+        _potentiallyOwed.add(msg.sender);
 
         emit StakeClaimedFromSolved(puzzleId, msg.sender, myStake);
     }
@@ -359,11 +416,137 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (amount == 0) revert NothingToWithdraw();
 
         balances[msg.sender] = 0;
+        _potentiallyOwed.add(msg.sender);
 
         emit Withdrawal(msg.sender, amount);
 
         (bool success,) = msg.sender.call{value: amount}("");
         if (!success) revert TransferFailed();
+    }
+
+    /// @inheritdoc IGuessGame
+    function sweepStaleBounty(uint256 puzzleId) external notSettled {
+        Puzzle storage puzzle = puzzles[puzzleId];
+        if (puzzle.creator == address(0)) revert PuzzleNotFound();
+        if (!puzzle.forfeited) revert PuzzleNotForfeited();
+        // Mirrors the sentinel in `_isForfeitFinalized`: a forfeited puzzle without a recorded
+        // forfeit timestamp must come from a pre-upgrade forfeit (the old struct had no
+        // `forfeitedAt` slot). Without that anchor we can't prove the 90-day window has
+        // elapsed, so refuse the sweep — guessers can still claim their stake indefinitely
+        // via `claimFromForfeited`.
+        if (puzzle.forfeitedAt == 0) revert ClaimWindowOpen();
+        if (block.timestamp < puzzle.forfeitedAt + CLAIM_TIMEOUT) revert ClaimWindowOpen();
+
+        // Telescoping cumulative division mirrors claimFromForfeited so the same totals
+        // hold whether claims happen first or the sweep absorbs everything.
+        uint256 a = puzzle.challengesClaimed;
+        uint256 distributed = (puzzle.bounty * a) / puzzle.pendingAtForfeit;
+        uint256 unclaimed = puzzle.bounty - distributed;
+        if (unclaimed == 0) revert NothingToSweep();
+
+        // Zero the bounty so any future claimFromForfeited returns only stake. Stakes are
+        // tracked separately in guesserStakeTotal and remain claimable indefinitely; the
+        // sweep takes the unclaimed bounty, nothing else.
+        puzzle.bounty = 0;
+        puzzle.challengesClaimed = puzzle.pendingAtForfeit;
+
+        emit StaleBountySwept(puzzleId, unclaimed);
+
+        _fundTreasury(unclaimed, "stale-bounty-sweep");
+    }
+
+    /// @dev Internal helper for the two non-settlement outbound paths into Rewards
+    ///      (forfeitPuzzle, sweepStaleBounty). try/catch normalizes any treasury
+    ///      misconfiguration to TransferFailed, matching the rest of the contract's
+    ///      failure vocabulary. The settlement-side route lives in `_routeDustToTreasury`
+    ///      and reverts SettleTransferFailed per the Settleable interface contract.
+    function _fundTreasury(uint256 amount, string memory reason) private {
+        try Rewards(payable(treasury)).fundRewards{value: amount}(reason) {
+        // no-op
+        }
+        catch {
+            revert TransferFailed();
+        }
+    }
+
+    /// @inheritdoc IGuessGame
+    /// @dev O(puzzleCount) — owner pre-flights this off-chain or via static call before
+    ///      paying the gas of `settleNext`. The cost is a single SLOAD per puzzle.
+    function canSettle() public view returns (bool) {
+        if (!paused()) return false;
+        uint256 n = puzzleCount;
+        for (uint256 i; i < n; i++) {
+            Puzzle storage p = puzzles[i];
+            if (!p.solved && !p.cancelled && !p.forfeited) return false;
+            if (p.forfeited && !_isForfeitFinalized(p)) return false;
+        }
+        return true;
+    }
+
+    /// @dev A forfeited puzzle is "finalized" once the claim window has elapsed AND its
+    ///      bounty accounting is frozen — `challengesClaimed == pendingAtForfeit` holds
+    ///      either when every guesser claimed (the cumulative-divisor in claimFromForfeited
+    ///      sets it) or when sweepStaleBounty was called (which also sets the equality and
+    ///      zeros the bounty). Without that guarantee, claimFromForfeited (still callable
+    ///      while paused) could shift _computeOwed between settleNext batches and leak
+    ///      non-trivial bounty into settleAll's dust sweep.
+    function _isForfeitFinalized(Puzzle storage p) private view returns (bool) {
+        if (p.forfeitedAt == 0) return false; // defensive sentinel
+        if (block.timestamp < p.forfeitedAt + CLAIM_TIMEOUT) return false;
+        return p.challengesClaimed == p.pendingAtForfeit;
+    }
+
+    /// @notice Number of addresses queued for settlement (auto-registered on first interaction)
+    function potentiallyOwedCount() external view returns (uint256) {
+        return _potentiallyOwed.length();
+    }
+
+    /// @notice Address at queue position `i` in the settlement queue
+    /// @dev Useful for off-chain pre-flighting `settleNext` cursor planning
+    function potentiallyOwedAt(uint256 i) external view returns (address) {
+        return _potentiallyOwed.at(i);
+    }
+
+    /// @notice Current cursor position into the settlement queue (advanced by settleNext)
+    function settleCursor() external view returns (uint256) {
+        return _settleCursor;
+    }
+
+    /// @inheritdoc Settleable
+    function _potentiallyOwedLength() internal view override returns (uint256) {
+        return _potentiallyOwed.length();
+    }
+
+    /// @inheritdoc Settleable
+    function _potentiallyOwedAt(uint256 i) internal view override returns (address) {
+        return _potentiallyOwed.at(i);
+    }
+
+    /// @inheritdoc Settleable
+    function _readSettleCursor() internal view override returns (uint256) {
+        return _settleCursor;
+    }
+
+    /// @inheritdoc Settleable
+    function _writeSettleCursor(uint256 v) internal override {
+        _settleCursor = v;
+    }
+
+    /// @inheritdoc Settleable
+    function _canSettle() internal view override returns (bool) {
+        return canSettle();
+    }
+
+    /// @inheritdoc Settleable
+    function _routeDustToTreasury(uint256 amount, string memory reason) internal override {
+        // try/catch normalizes treasury misconfiguration to SettleTransferFailed, matching
+        // the failure mode of the other outbound paths (forfeitPuzzle, sweepStaleBounty).
+        try Rewards(payable(treasury)).fundRewards{value: amount}(reason) {
+        // no-op
+        }
+        catch {
+            revert SettleTransferFailed();
+        }
     }
 
     function _isSettled() internal view override returns (bool) {
@@ -383,6 +566,13 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
     }
 
     function _computeOwed(address addr) internal view override returns (uint256 owed) {
+        // Defense-in-depth: only credit funds tied to terminal puzzles. canSettle (the
+        // settleNext/settleAll precondition) already requires every puzzle to be solved,
+        // cancelled, or forfeited, so there is no path that legitimately credits creator
+        // funds for an active puzzle here. Solved-puzzle collateral was already pushed to
+        // balances[creator] by respondToChallenge, cancelled-puzzle funds were paid out
+        // directly, and forfeited-puzzle collateral was routed to the treasury — so the
+        // only creator-side residual is the balances[addr] credit captured below.
         owed = balances[addr];
 
         for (uint256 pid; pid < puzzleCount; pid++) {
@@ -403,11 +593,6 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
             if (p.solved && !guesserClaimed[pid][addr]) {
                 uint256 myStake = guesserStakeTotal[pid][addr];
                 if (myStake > 0) owed += myStake;
-            }
-
-            // Active puzzle creator funds
-            if (!p.solved && !p.cancelled && !p.forfeited && p.creator == addr) {
-                owed += p.bounty + p.collateral;
             }
         }
     }
