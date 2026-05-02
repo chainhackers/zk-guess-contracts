@@ -121,10 +121,11 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
         if (_verifier == address(0)) revert InvalidVerifierAddress();
         verifier = IGroth16Verifier(_verifier);
 
-        // Reject EOAs and self-destructed contracts here so the funding-gate invariant is
-        // enforced at deploy time — every wire from GuessGame into the rewards pool must
-        // hit a contract with `fundRewards(string)`. Doesn't prove the target is actually
-        // a Rewards instance, but eliminates the silent-EOA failure mode.
+        // Reject the zero address, EOAs, and self-destructed contracts. This only proves
+        // GuessGame points at an address with deployed code at init time; it does not prove
+        // the target is a Rewards instance or that it implements `fundRewards(string)`. The
+        // `_fundTreasury` helper's try/catch normalizes any wrong-shape callee to
+        // `TransferFailed`, but this check eliminates the silent-EOA failure mode up front.
         if (_treasury == address(0) || _treasury.code.length == 0) revert InvalidTreasuryAddress();
         treasury = _treasury;
 
