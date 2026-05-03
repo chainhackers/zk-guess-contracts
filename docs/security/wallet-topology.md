@@ -22,13 +22,14 @@ disclosed wallet, never linked to the operator funding graph.
 
 | Role | Address | Funded from | First tx | Notes |
 |---|---|---|---|---|
-| Deployer | <!-- TODO: 0x... after Phase B keygen --> | Funding (exact gas, ≤0.01 ETH) | <!-- TODO: deploy tx hash --> | Retired after deploy. Public attestation: "this address only ever deploys." |
-| Funding | <!-- TODO: 0x... after Phase B keygen --> | <!-- TODO: exchange name (e.g. KuCoin / MEXC), single CEX withdrawal --> | <!-- TODO: first tx hash; CEX hot wallet → funding --> | No DEX swaps, no contract intermediaries, no chain-hop on the funding path. The exchange is named explicitly to make the actor graph auditable end-to-end. |
-| Operator | <!-- TODO: 0x... after Phase B keygen --> | Funding (operator gas) | <!-- TODO: first tx hash --> | `owner()` of `Rewards` and `GuessGame` proxy. |
+| Deployer | [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d) | Funding (exact gas, ≤0.01 ETH) | <!-- TODO: deploy tx hash --> | Retired after deploy. Public attestation: "this address only ever deploys." |
+| Funding | [`0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865`](https://basescan.org/address/0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865) | <!-- TODO: exchange name + tx hash; single CEX withdrawal, no DEX/contract intermediaries --> | <!-- TODO: CEX hot wallet → funding tx hash --> | No DEX swaps, no contract intermediaries, no chain-hop on the funding path. The exchange is named explicitly to make the actor graph auditable end-to-end. |
+| Operator | [`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4) | Funding (operator gas) | <!-- TODO: first inbound tx hash --> | `owner()` of `Rewards` and `GuessGame` proxy. |
 
-Once Phase B keygen is done and the addresses are funded, this table is filled in with
-real hashes and the markdown is updated in a single PR. The placeholders are not a
-secret; they're literally not generated yet.
+Phase B keygen complete (2026-05-03). Outstanding TODOs above are filled in
+post-funding (CEX withdrawal trace) and post-deploy (deploy tx hash). Keystores live
+locally at `~/.zkguess-keystores/zkg-{deployer,funding,operator}` (not in git;
+backed up to offline cold storage with separate passwords).
 
 ## v1 (legacy, do not interact)
 
