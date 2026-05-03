@@ -94,6 +94,12 @@ Contracts are automatically verified on Sourcify during deployment.
 - Guess submission: ~327k gas  
 - Proof verification + response: ~245-595k gas (varies by outcome)
 
+## Security
+
+- Disclosure contact, bug bounty terms, and admin-authority disclosure: [`SECURITY.md`](SECURITY.md).
+- Threat model and non-mixer explainer (the body submitted to Blockaid): [`docs/security/not-a-mixer.md`](docs/security/not-a-mixer.md).
+- Wallet topology — which addresses hold which roles, and what each is allowed to do: [`docs/security/wallet-topology.md`](docs/security/wallet-topology.md).
+
 ## License
 
 MIT
