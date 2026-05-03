@@ -51,7 +51,7 @@ Briefly:
 | Role | Authority | Constraint |
 |---|---|---|
 | Deployer | Deploy four contracts, call `initialize(owner=operator)`. Retired after the deploy tx batch. | Never holds ownership. Never plays. |
-| Funding | Sends ETH to deployer (exact gas) and operator (gas) and to `Rewards.fundRewards("donation")`. | Never deploys. Never plays. Never holds ownership. |
+| Funding | Sends ETH to deployer (exact gas) and operator (gas) and to `Rewards.fundRewards("donation")`. Itself funded by a single, disclosed CEX withdrawal (exchange name + tx hash recorded in [`docs/security/wallet-topology.md`](docs/security/wallet-topology.md)). | Never deploys. Never plays. Never holds ownership. |
 | Operator | `owner()` of `GuessGame` proxy and `Rewards`. Calls `pause`, `publishRoot`, `settleNext`, `settleAll`. | Never plays. Never deploys. |
 
 **Operational rule:** an operator wanting to play the game uses a separate disclosed

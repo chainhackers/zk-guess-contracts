@@ -132,8 +132,9 @@ Three distinct keypairs, none of which ever creates a puzzle, submits a guess, o
 a reward. Documented per-address in [`wallet-topology.md`](./wallet-topology.md).
 
 - **Deployer** — one-shot keypair; deploys the four contracts and is retired.
-- **Funding** — receives ETH from a named CEX (Coinbase / Kraken); sends operator gas
-  and fundRewards top-ups; never plays.
+- **Funding** — receives ETH from a single, disclosed CEX withdrawal (exchange name and
+  tx hash recorded in [`wallet-topology.md`](./wallet-topology.md) and the Blockaid
+  filing); sends operator gas and fundRewards top-ups; never plays.
 - **Operator** — owner of `GuessGame` proxy and `Rewards`; calls `pause`, `publishRoot`,
   `settleNext`/`settleAll`; never plays.
 

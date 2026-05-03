@@ -12,7 +12,7 @@ clustering attention. New deployer, new owner, new funder — all distinct, all 
 | Role | What it does | What it never does |
 |---|---|---|
 | **Deployer** | One-shot: deploys `GuessVerifier`, `Rewards`, `GuessGame` impl, `ERC1967Proxy`, calls `initialize` with the operator as owner. Retired forever after the deploy tx batch. | Never owns the contracts. Never plays. Never funds. Never receives admin txs. |
-| **Funding** | Receives ETH from a named CEX (Coinbase / Kraken) withdrawal. Tops up the rewards pool via `Rewards.fundRewards("donation")`. Pays operator gas. Sends exact-gas to deployer for the one-shot deploy. | Never deploys. Never plays. Never owns anything. |
+| **Funding** | Receives ETH from a single, disclosed CEX withdrawal (the exchange name and tx hash are recorded below and in the Blockaid submission). Tops up the rewards pool via `Rewards.fundRewards("donation")`. Pays operator gas. Sends exact-gas to deployer for the one-shot deploy. | Never deploys. Never plays. Never owns anything. No DEX swaps, no contract intermediaries, no chain-hop on the funding path. |
 | **Operator** | Owner of `GuessGame` proxy and `Rewards`. Calls `pause()`, `publishRoot()`, `settleNext()`, `settleAll()`. | Never deploys. Never plays. Never receives ETH from any non-funding source. |
 
 **Operational rule:** any of the three operators wanting to play uses a separate
@@ -23,7 +23,7 @@ disclosed wallet, never linked to the operator funding graph.
 | Role | Address | Funded from | First tx | Notes |
 |---|---|---|---|---|
 | Deployer | <!-- TODO: 0x... after Phase B keygen --> | Funding (exact gas, ≤0.01 ETH) | <!-- TODO: deploy tx hash --> | Retired after deploy. Public attestation: "this address only ever deploys." |
-| Funding | <!-- TODO: 0x... after Phase B keygen --> | Coinbase / Kraken withdrawal | <!-- TODO: first tx hash --> | No DEX swaps, no mixer-adjacent path in the actor graph. |
+| Funding | <!-- TODO: 0x... after Phase B keygen --> | <!-- TODO: exchange name (e.g. KuCoin / MEXC), single CEX withdrawal --> | <!-- TODO: first tx hash; CEX hot wallet → funding --> | No DEX swaps, no contract intermediaries, no chain-hop on the funding path. The exchange is named explicitly to make the actor graph auditable end-to-end. |
 | Operator | <!-- TODO: 0x... after Phase B keygen --> | Funding (operator gas) | <!-- TODO: first tx hash --> | `owner()` of `Rewards` and `GuessGame` proxy. |
 
 Once Phase B keygen is done and the addresses are funded, this table is filled in with
