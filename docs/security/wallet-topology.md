@@ -23,7 +23,7 @@ disclosed wallet, never linked to the operator funding graph.
 | Role | Address | Funded from | First tx | Notes |
 |---|---|---|---|---|
 | Deployer | [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d) | Funding (exact gas, ≤0.01 ETH) | <!-- TODO: deploy tx hash --> | Retired after deploy. Public attestation: "this address only ever deploys." |
-| Funding | [`0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865`](https://basescan.org/address/0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865) | <!-- TODO: exchange name + tx hash; single CEX withdrawal, no DEX/contract intermediaries --> | <!-- TODO: CEX hot wallet → funding tx hash --> | No DEX swaps, no contract intermediaries, no chain-hop on the funding path. The exchange is named explicitly to make the actor graph auditable end-to-end. |
+| Funding | [`0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865`](https://basescan.org/address/0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865) | KuCoin hot wallet [`0x18b0F4547A89fe4C5FE84F258BeA3601FA281e9f`](https://basescan.org/address/0x18b0F4547A89fe4C5FE84F258BeA3601FA281e9f) (Basescan-labeled), single Base withdrawal | [`0x2bdb477cae429cb2e3c07287e238faac1cf5e17b508069db316fe16f7e20092f`](https://basescan.org/tx/0x2bdb477cae429cb2e3c07287e238faac1cf5e17b508069db316fe16f7e20092f) — 0.05 ETH, 2026-05-05 | Single hop, no DEX swaps, no contract intermediaries, no chain-hop. |
 | Operator | [`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4) | Funding (operator gas) | <!-- TODO: first inbound tx hash --> | `owner()` of `Rewards` and `GuessGame` proxy. |
 
 Phase B keygen complete (2026-05-03). Outstanding TODOs above are filled in
