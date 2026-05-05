@@ -131,7 +131,7 @@ funds to a chosen address.
 Three distinct keypairs, none of which ever creates a puzzle, submits a guess, or claims
 a reward. Documented per-address in [`wallet-topology.md`](./wallet-topology.md).
 
-- **Deployer** — one-shot keypair; deploys the four contracts and is retired.
+- **Deployer** — deploys the four contracts at v2 launch; may also deploy future `GuessGame` implementation contracts for UUPS upgrades. Never holds ownership; the operator (proxy owner) performs the `upgradeToAndCall` itself.
 - **Funding** — receives ETH from a single, disclosed CEX withdrawal (exchange name and
   tx hash recorded in [`wallet-topology.md`](./wallet-topology.md) and the Blockaid
   filing); sends operator gas and fundRewards top-ups; never plays.
@@ -145,12 +145,25 @@ funding.
 
 - Source verified on Sourcify and Basescan for all four contracts (`GuessVerifier`,
   `Rewards`, `GuessGame` impl, `ERC1967Proxy`).
-- Circuits source + verification key + final proving key published at
-  [`chainhackers/zk-guess-circuits/releases/tag/v2.0.0`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0).
-- Trusted-setup ceremony with ≥3 contributors + drand/Bitcoin block beacon; transcript
-  in the circuits repo.
-- `ProjectMetadata` event emitted at deploy time with `homepage`, `circuitRepo`,
-  `vkeyChecksum`, `auditUrl` for indexers / scanners.
+- Phase-2 trusted-setup ceremony for `circuits/guess.circom`, sealed 2026-04-28 by a
+  Bitcoin-block beacon (block 947059, 2^10 iterations), with 5 human contributors
+  ([@chainhacker](https://farcaster.xyz/chainhacker), [@darkliv](https://farcaster.xyz/darkliv),
+  [@madco](https://farcaster.xyz/madco), [@codejedi](https://farcaster.xyz/codejedi),
+  [@kinco](https://farcaster.xyz/kinco)). Per-contribution hashes, the final zkey, the
+  `verification_key.json`, the per-contributor intermediate zkeys, and the
+  `snarkjs zkey verify` output are all published at
+  [`chainhackers/zk-guess-circuits/releases/tag/v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony).
+- The deployed `GuessVerifier` (Base mainnet `0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`)
+  is the `GuessVerifier.sol` artifact attached to that release. Sourcify match against the
+  ceremony release is the sufficient on-chain anchor — anyone can reproduce
+  `snarkjs zkey verify generated/guess.r1cs generated/pot15_final.ptau guess_final.zkey`
+  to confirm the verifying key.
+- `ProjectMetadata` event is emitted at deploy time with `homepage`, `circuitRepo`,
+  `vkeyChecksum`, `auditUrl` fields. **Known gaps in the v2 launch deploy:**
+  `vkeyChecksum` and `auditUrl` were emitted blank, and `circuitRepo` points at a
+  stale tag (`v2.0.0`) instead of the actual `v2-ceremony` tag — these will be fixed
+  in the next implementation upgrade. The canonical ceremony pointer is in this
+  document and in [`SECURITY.md`](../../SECURITY.md).
 
 ## Reputation pointers
 

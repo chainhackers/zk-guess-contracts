@@ -58,14 +58,25 @@ forge test --match-path test/GuessGame.t.sol
 
 ## Deployed Contracts (Base Mainnet)
 
-- **GuessGame (Proxy)**: [`0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590`](https://basescan.org/address/0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590)
-- Implementation: [`0x4a2d3b37b7a4b99ee523b3c47993876501d2d850`](https://basescan.org/address/0x4a2d3b37b7a4b99ee523b3c47993876501d2d850)
+v2 — deployed 2026-05-05, block 45605232. Owner (operator) is
+[`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4); deployer wallet
+[`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d)
+holds no admin authority. See [`docs/security/wallet-topology.md`](docs/security/wallet-topology.md).
+
+- **GuessGame (Proxy)**: [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)
+- Implementation: [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)
+- Verifier: [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C)
+- Rewards: [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F) — merkle-distributed rewards pool funded by forfeit collateral
+
+### Previous deployments
+
+v1 (to be sealed via `settleAll(...)` as part of the v2 cutover; do not interact):
+
+- GuessGame (Proxy): [`0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590`](https://basescan.org/address/0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590)
 - Verifier: [`0xface0e73719e78e3bb020001fd10b62af9b3b6b8`](https://basescan.org/address/0xface0e73719e78e3bb020001fd10b62af9b3b6b8)
-- Rewards: [`0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c`](https://basescan.org/address/0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c) — merkle-distributed rewards pool funded by forfeit collateral
+- Rewards: [`0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c`](https://basescan.org/address/0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c)
 
-### Previous deployment (permanently settled)
-
-The previous proxy at `0xfa37cdcff862114c88c8e19b10b362d611a2c45f` was settled and renounced on 2026-04-16 (tx [`0xa35864ad...`](https://basescan.org/tx/0xa35864ad1d656a355bc5199b4aad2699f1689d82c4ce0333fa5e84c507eb61b1)) — all user funds were distributed and the contract is permanently sealed. Do not interact with it.
+Pre-v1: proxy at `0xfa37cdcff862114c88c8e19b10b362d611a2c45f` was settled and renounced on 2026-04-16 (tx [`0xa35864ad...`](https://basescan.org/tx/0xa35864ad1d656a355bc5199b4aad2699f1689d82c4ce0333fa5e84c507eb61b1)) — all user funds were distributed and the contract is permanently sealed.
 
 ## Architecture
 
@@ -87,6 +98,7 @@ Contracts are automatically verified on Sourcify during deployment.
 - Run `bun run copy-to-contracts` in the circuits repo to update the verifier
 - The verifier expects 2 public signals: `[commitment, isCorrect]`
 - The build will show "unreachable code" warnings - these are expected due to the assembly code in the auto-generated verifier using early returns
+- The deployed v2 verifier corresponds to circuits release [`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony) — phase-2 trusted setup, 5 contributors + Bitcoin-block beacon (sealed 2026-04-28). See [`SECURITY.md`](SECURITY.md) and [`docs/security/not-a-mixer.md`](docs/security/not-a-mixer.md).
 
 ## Gas Costs
 

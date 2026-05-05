@@ -21,8 +21,8 @@ echo "==================================="
 echo "  MAINNET DEPLOYMENT - USE CAUTION"
 echo "==================================="
 echo ""
-echo "Deployer (one-shot, retired after this tx): $DEPLOYER_ADDRESS"
-echo "Owner    (operator, post-deploy admin):     $OWNER"
+echo "Deployer (deploys impls; never owns):  $DEPLOYER_ADDRESS"
+echo "Owner    (operator, post-deploy admin): $OWNER"
 echo ""
 read -p "Proceed with mainnet deployment? (yes/no): " confirm
 if [ "$confirm" != "yes" ]; then
@@ -30,10 +30,16 @@ if [ "$confirm" != "yes" ]; then
     exit 0
 fi
 
+DEPLOYER_KEYSTORE="$HOME/.zkguess-keystores/zkg-deployer"
+if [ ! -f "$DEPLOYER_KEYSTORE" ]; then
+    echo "ERROR: deployer keystore not found at $DEPLOYER_KEYSTORE" >&2
+    exit 1
+fi
+
 forge script script/Deploy.s.sol \
   --rpc-url $BASE_RPC_URL \
   --chain 8453 \
-  --account deployer \
+  --keystore "$DEPLOYER_KEYSTORE" \
   --sender $DEPLOYER_ADDRESS \
   --broadcast \
   --verify \

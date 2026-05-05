@@ -11,7 +11,7 @@ clustering attention. New deployer, new owner, new funder — all distinct, all 
 
 | Role | What it does | What it never does |
 |---|---|---|
-| **Deployer** | One-shot: deploys `GuessVerifier`, `Rewards`, `GuessGame` impl, `ERC1967Proxy`, calls `initialize` with the operator as owner. Retired forever after the deploy tx batch. | Never owns the contracts. Never plays. Never funds. Never receives admin txs. |
+| **Deployer** | Deploys `GuessVerifier`, `Rewards`, `GuessGame` impl, `ERC1967Proxy`; calls `initialize` with the operator as owner. May redeploy future `GuessGame` implementation contracts for UUPS upgrades — actual `upgradeToAndCall` is then performed by the operator (proxy owner), not the deployer. | Never owns the contracts. Never plays. Never funds. Never receives admin txs. |
 | **Funding** | Receives ETH from a single, disclosed CEX withdrawal (the exchange name and tx hash are recorded below and in the Blockaid submission). Tops up the rewards pool via `Rewards.fundRewards("donation")`. Pays operator gas. Sends exact-gas to deployer for the one-shot deploy. Seeds external incentive campaigns (boost.xyz, Farcaster mini-app boosts) with single-hop transfers to the campaign contract — boost.xyz pays winners directly from its own escrow, funding never routes per-user rewards itself. | Never deploys. Never plays. Never owns anything. No DEX swaps, no contract intermediaries on the inbound path, no per-user payouts on the outbound path. |
 | **Operator** | Owner of `GuessGame` proxy and `Rewards`. Calls `pause()`, `publishRoot()`, `settleNext()`, `settleAll()`. | Never deploys. Never plays. Never receives ETH from any non-funding source. |
 
@@ -22,14 +22,13 @@ disclosed wallet, never linked to the operator funding graph.
 
 | Role | Address | Funded from | First tx | Notes |
 |---|---|---|---|---|
-| Deployer | [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d) | Funding, 0.001 ETH inbound: [`0x2b5bc1776745bbe80aafc3459dd53d90a420fc9e685f7c470c54395a1b009d87`](https://basescan.org/tx/0x2b5bc1776745bbe80aafc3459dd53d90a420fc9e685f7c470c54395a1b009d87) | <!-- TODO: deploy tx hash --> | Retired after deploy. Public attestation: "this address only ever deploys." |
+| Deployer | [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d) | Funding, 0.001 ETH inbound: [`0x2b5bc1776745bbe80aafc3459dd53d90a420fc9e685f7c470c54395a1b009d87`](https://basescan.org/tx/0x2b5bc1776745bbe80aafc3459dd53d90a420fc9e685f7c470c54395a1b009d87) | v2 deploy (block 45605232, 2026-05-05): [`Verifier`](https://basescan.org/tx/0xdf65019ab799bebeb08dd00f91334273ec0e9215106b029fa2f510db200ab780), [`GuessGame impl`](https://basescan.org/tx/0x3fee9e89977b16dc9e2d9be1f993640d56f526fee7859e5d6ee15d6f1323602c), [`Rewards`](https://basescan.org/tx/0x4644486635022aa671b2cfef3f615624c098706fb4a952c116ba2c05c595061b), [`ERC1967Proxy`](https://basescan.org/tx/0x1aec873dc1a07fce5b7080dfd4d63af426b9dcc6a5559dd978d6bd58d0c3d264) | One-shot for initial deploy; may redeploy future impls for UUPS upgrades. Public attestation: "this address only ever deploys contracts; never owns or plays." |
 | Funding | [`0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865`](https://basescan.org/address/0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865) | KuCoin hot wallet [`0x18b0F4547A89fe4C5FE84F258BeA3601FA281e9f`](https://basescan.org/address/0x18b0F4547A89fe4C5FE84F258BeA3601FA281e9f) (Basescan-labeled), single Base withdrawal | [`0x2bdb477cae429cb2e3c07287e238faac1cf5e17b508069db316fe16f7e20092f`](https://basescan.org/tx/0x2bdb477cae429cb2e3c07287e238faac1cf5e17b508069db316fe16f7e20092f) — 0.05 ETH, 2026-05-05 | Single hop, no DEX swaps, no contract intermediaries, no chain-hop. |
 | Operator | [`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4) | Funding, 0.002 ETH inbound: [`0xcecd09e463a9c8cf8bf8fca48a118a52a3958c840fddd3a8f59df91ab10dcec1`](https://basescan.org/tx/0xcecd09e463a9c8cf8bf8fca48a118a52a3958c840fddd3a8f59df91ab10dcec1) | [`0xcecd09e463a9c8cf8bf8fca48a118a52a3958c840fddd3a8f59df91ab10dcec1`](https://basescan.org/tx/0xcecd09e463a9c8cf8bf8fca48a118a52a3958c840fddd3a8f59df91ab10dcec1) | `owner()` of `Rewards` and `GuessGame` proxy. |
 
-Phase B keygen complete (2026-05-03). Outstanding TODOs above are filled in
-post-funding (CEX withdrawal trace) and post-deploy (deploy tx hash). Keystores live
-locally at `~/.zkguess-keystores/zkg-{deployer,funding,operator}` (not in git;
-backed up to offline cold storage with separate passwords).
+Phase B keygen complete (2026-05-03), funded (2026-05-05), v2 deployed (2026-05-05).
+Keystores live locally at `~/.zkguess-keystores/zkg-{deployer,funding,operator}`
+(not in git; backed up to offline cold storage with separate passwords).
 
 ## v1 (legacy, do not interact)
 

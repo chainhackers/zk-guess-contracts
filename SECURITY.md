@@ -50,7 +50,7 @@ Briefly:
 
 | Role | Authority | Constraint |
 |---|---|---|
-| Deployer | Deploy four contracts, call `initialize(owner=operator)`. Retired after the deploy tx batch. | Never holds ownership. Never plays. |
+| Deployer | Deploy four contracts, call `initialize(owner=operator)`. May also deploy future `GuessGame` implementation contracts for UUPS upgrades; the operator (proxy owner) performs the actual `upgradeToAndCall`. | Never holds ownership. Never plays. |
 | Funding | Sends ETH to deployer (exact gas) and operator (gas) and to `Rewards.fundRewards("donation")`. Itself funded by a single, disclosed CEX withdrawal (exchange name + tx hash recorded in [`docs/security/wallet-topology.md`](docs/security/wallet-topology.md)). | Never deploys. Never plays. Never holds ownership. |
 | Operator | `owner()` of `GuessGame` proxy and `Rewards`. Calls `pause`, `publishRoot`, `settleNext`, `settleAll`. | Never plays. Never deploys. |
 
@@ -83,7 +83,13 @@ shortlist for Phase G alongside multisig migration.
 
 - `src/generated/GuessVerifier.sol` is auto-generated from the circuits repo at
   [`chainhackers/zk-guess-circuits`](https://github.com/chainhackers/zk-guess-circuits).
-  Bugs in this file should be reported against the circuits repo; we will rebuild and
-  redeploy upstream.
+  The deployed v2 verifier on Base mainnet
+  ([`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C))
+  corresponds to the `GuessVerifier.sol` artifact attached to release
+  [`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony) —
+  output of a phase-2 trusted-setup ceremony with 5 contributors plus a Bitcoin-block
+  beacon (block 947059), sealed 2026-04-28. Bugs in this file should be reported against
+  the circuits repo; we will rebuild, re-run the ceremony if soundness is affected, and
+  redeploy.
 - `lib/openzeppelin-contracts*` — please report OZ contract bugs upstream first; we
   will pin / patch as appropriate.
