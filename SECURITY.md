@@ -87,7 +87,7 @@ shortlist for Phase G alongside multisig migration.
 - `src/generated/GuessVerifier.sol` is auto-generated from the circuits repo at
   [`chainhackers/zk-guess-circuits`](https://github.com/chainhackers/zk-guess-circuits).
   The deployed v2 verifier on Base mainnet
-  ([`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C))
+  ([`0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9`](https://basescan.org/address/0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9))
   corresponds to the `GuessVerifier.sol` artifact attached to release
   [`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony) —
   output of a phase-2 trusted-setup ceremony with 5 contributors plus a Bitcoin-block

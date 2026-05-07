@@ -1,11 +1,14 @@
 # Anti-Mixer Redeploy — As Built
 
-**Status:** Shipped 2026-05-05 to Base mainnet (block 45605232).
+**Status:** v2 launched 2026-05-05 (block 45605232); v2.1 redeployed
+2026-05-07 (block 45686113) after the v2 launch verifier was found to have
+been built from the dev-build zkey rather than the ceremony-final one.
+v2.1 is the live stack.
 **Issue:** [#39](https://github.com/chainhackers/zk-guess-contracts/issues/39) (umbrella tracker for the v2 redeploy).
 **Related PRs:** #41 (C0 v2 circuit wiring) · #42 (this doc — original
 pre-implementation draft, since superseded by the contents below) · #43
-(Phase C contract hardening) · #44 (Phase B/D wallet topology + deploy
-script + v2 deploy).
+(Phase C contract hardening) · #44 (Phase B/D wallet topology + v2 launch
+deploy) · #47 (this doc + v2.1 ceremony-verifier redeploy, closing #46).
 **Original draft:** preserved in git history at commits `6ca5bc9` (created
 2026-04-26) and `b9af930` (PR #42 review revision). Read that for the
 pre-implementation perspective; this document reflects what actually shipped.
@@ -32,16 +35,31 @@ the time of this writing).
 
 ## Deployed contracts (Base mainnet)
 
+v2.1 — live stack, deployed 2026-05-07 (block 45686113) after the dev-zkey
+discovery on the v2 launch deploy. See `## v2.1 redeploy (2026-05-07)` below
+for the discovery + resolution.
+
 | Contract           | Address                                                                                                                       | Deploy tx                                                                                                                              |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| GuessGame proxy    | [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)        | [`0x1aec873d…`](https://basescan.org/tx/0x1aec873dc1a07fce5b7080dfd4d63af426b9dcc6a5559dd978d6bd58d0c3d264)                              |
-| GuessGame impl     | [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)        | [`0x3fee9e89…`](https://basescan.org/tx/0x3fee9e89977b16dc9e2d9be1f993640d56f526fee7859e5d6ee15d6f1323602c)                              |
-| Verifier (Groth16) | [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C)        | [`0xdf65019a…`](https://basescan.org/tx/0xdf65019ab799bebeb08dd00f91334273ec0e9215106b029fa2f510db200ab780)                              |
-| Rewards            | [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F)        | [`0x46444866…`](https://basescan.org/tx/0x4644486635022aa671b2cfef3f615624c098706fb4a952c116ba2c05c595061b)                              |
+| GuessGame proxy    | [`0x6F890B08fa4312135E1b4CF03929f8e389A866B4`](https://basescan.org/address/0x6F890B08fa4312135E1b4CF03929f8e389A866B4)        | [`0x6dab6120…`](https://basescan.org/tx/0x6dab612018783d7d9f950bfa5a61ea672a84c7badf94129861cfd17631a19bc4)                              |
+| GuessGame impl     | [`0x9217A110A5663f8685f0251a5892662b9f0Efb19`](https://basescan.org/address/0x9217A110A5663f8685f0251a5892662b9f0Efb19)        | [`0x86180416…`](https://basescan.org/tx/0x86180416ba6a33d3fdeedb0774b1aa1470bc96bf2051890225817047a9bd8da9)                              |
+| Verifier (Groth16) | [`0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9`](https://basescan.org/address/0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9)        | [`0xeb61182b…`](https://basescan.org/tx/0xeb61182ba7c4ac81a2eff3dae37e35e3948c88e50e7e1db0fb9923633738a93b)                              |
+| Rewards            | [`0xE9f7aE2A1E574d47CfD19dfB6B2059a31e127f01`](https://basescan.org/address/0xE9f7aE2A1E574d47CfD19dfB6B2059a31e127f01)        | [`0xb0552206…`](https://basescan.org/tx/0xb055220602f6da5b55f488d8d2220e8e9f576dc4e513dfadbb4c1eee26ca5aa6)                              |
 
 All four contracts verified on Sourcify and Basescan during the deploy run
 (`forge script ... --verify --verifier sourcify` plus a post-deploy Basescan
 verification pass).
+
+### Superseded v2 launch addresses (deployed 2026-05-05, block 45605232; do not interact)
+
+- GuessGame proxy: [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)
+- GuessGame impl: [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)
+- Verifier: [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C) — built from the dev-build zkey, not the ceremony-final zkey
+- Rewards: [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F)
+
+These contracts have zero state and zero ETH. They will remain on-chain
+indefinitely (no deletion path) but are no longer referenced from this
+repo.
 
 ## Wallet roles (three-role separation)
 
@@ -78,10 +96,12 @@ the `snarkjs zkey verify` output are all published as
 [`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony).
 
 **Divergence from original draft:** the release tag is `v2-ceremony`, not the
-originally-planned `v2.0.0`. The on-chain `ProjectMetadata` event emitted at
-`initialize` (Phase C7 below) still carries the stale `circuitRepo=v2.0.0`
-URL pointing at the non-existent tag — to be corrected in the next impl
-upgrade.
+originally-planned `v2.0.0`. The v2.1 redeploy (#46/#47) corrected the
+on-chain `ProjectMetadata.circuitRepo` to point at the actual `v2-ceremony`
+tag and populated `vkeyChecksum` with the SHA-256 of `verification_key.json`
+(`2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179`). The
+superseded v2 launch deploy still emits the stale `v2.0.0` URL but is no
+longer referenced from this repo.
 
 ## Phase B — Wallet topology
 
@@ -126,19 +146,20 @@ permanently bricked finalization. Liveness > bug detection. The post-route
 the route); the `dust` field on the `Settled` event lets indexers flag
 unusually large amounts for off-chain reconciliation.
 
-**C7 known gap.** The launch deploy emitted `ProjectMetadata` with blank
-`vkeyChecksum`, blank `auditUrl`, and a stale `circuitRepo=v2.0.0` URL
-(pointing at a non-existent tag — the actual ceremony release is
-`v2-ceremony`). Off-chain readers should treat
-[`docs/security/not-a-mixer.md`](../../security/not-a-mixer.md) and
-[`SECURITY.md`](../../../SECURITY.md) as the canonical pointers. To be
-corrected in the next impl upgrade.
+**C7 fields on the live v2.1 deploy:** `circuitRepo` points at the actual
+[`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony)
+release, `vkeyChecksum` is `2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179`
+(SHA-256 of `verification_key.json` from the release), `auditUrl` is blank
+pending the Phase G named-firm audit. The superseded v2 launch deploy
+emitted `circuitRepo=v2.0.0` (non-existent tag) and blank checksums; that
+mismatch was the proximate trigger for the v2.1 redeploy (#46/#47).
 
 ## Phase D — Deploy / verify / submit
 
-Deployed 2026-05-05, block 45605232 (per-contract tx hashes in the deployed
-addresses table above). All four contracts verified on Sourcify + Basescan
-during the deploy script.
+v2.1 deployed 2026-05-07, block 45686113 (per-contract tx hashes in the
+deployed-contracts table above). All four contracts verified on Sourcify
+and Basescan during the deploy script. v2 launch (2026-05-05, block
+45605232) is superseded.
 
 **Pending sub-items** (tracked on issue #39):
 
@@ -175,6 +196,35 @@ extra script surface wasn't worth carrying. v2 uses regular `CREATE`.
 - GitHub Pages on `chainhackers/zk-guess-rewards` (blocked on
   private-repo + free-plan decision).
 
+## v2.1 redeploy (2026-05-07)
+
+The v2 launch deploy (2026-05-05, block 45605232) shipped with the
+**dev-build verifier** rather than the ceremony-final one. Discovery:
+during Phase D Blockaid-filing prep, `diff src/generated/GuessVerifier.sol`
+against the `GuessVerifier.sol` artifact in the
+[`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony)
+release showed different `delta{x1,x2,y1,y2}` constants — the proving key
+came from the dev contributor's single-shot setup, not the public
+5-contributor + BTC-block-947059 ceremony. The repository's own
+`circuits/BUILD_INFO.txt` had said exactly this: `BUILD=dev / WARNING:
+Single-contributor dev setup, NOT a trusted-setup ceremony. Do not deploy
+the derived GuessVerifier.sol to mainnet.` The warning was followed at
+import time but lost track of by the deploy.
+
+Resolution path chosen: fresh redeploy (v2.1) rather than UUPS
+reinitializer upgrade. v2 had zero usage state (`puzzleCount=0`, 0 ETH on
+proxy and Rewards, `currentEpoch=0`), so the reinitializer's only benefit
+(proxy address stability) was moot. Source PR #47 swapped the verifier
+file + zkey + tooling references and corrected the `ProjectMetadata`
+strings in `initialize`. Same `scripts/deploy-mainnet.sh` then redeployed
+all four contracts on 2026-05-07 (block 45686113); same Phase B keypairs
+(deployer/funding/operator) and same `.env`. All four v2.1 contracts
+verified on Sourcify and Basescan during the deploy.
+
+Audit-trail note: the superseded v2 launch contracts remain on-chain
+indefinitely (no deletion path), with zero state, zero ETH, and no admin
+calls. They are not referenced from this repo or its docs.
+
 ## Locked decisions (delta from the 2026-04-23 draft)
 
 1. **Init-time owner**, not post-deploy `transferOwnership(operator)`.
@@ -183,9 +233,8 @@ extra script surface wasn't worth carrying. v2 uses regular `CREATE`.
    not retired after the v2 launch tx batch.
 3. **KuCoin** as funding-source CEX (regional access; Coinbase/Kraken don't
    operate in Russia). Disclosure principle preserved.
-4. **Release tag `v2-ceremony`**, not `v2.0.0`. On-chain `ProjectMetadata`
-   still references the stale `v2.0.0` URL — to be fixed in the next impl
-   upgrade.
+4. **Release tag `v2-ceremony`**, not `v2.0.0`. The v2.1 deploy emits the
+   correct URL on-chain.
 5. **No CREATE2 / `DeployDeterministic.s.sol`.** Vanity addresses are not a
    meaningful mixer-defense signal.
 6. **`MAX_DUST` cap dropped** after PR #44 round-2 review (SELFDESTRUCT
@@ -195,6 +244,8 @@ extra script surface wasn't worth carrying. v2 uses regular `CREATE`.
    operationally.
 8. **v1 cutover deferred** to a separate PR (Phase F). v2 contracts are live
    independently of v1 sealing.
+9. **Fresh redeploy over reinitializer upgrade** (v2.1, #46/#47) since v2
+   had zero usage. Simpler audit trail, no UUPS reinit subtleties.
 
 ## References
 
