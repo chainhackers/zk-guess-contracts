@@ -209,15 +209,44 @@ contract RewardsTest is Test {
         assertEq(alice.balance, 0.15 ether);
     }
 
-    // ============ receive ============
+    // ============ fundRewards (gates the funding path; replaces bare receive) ============
 
-    function test_receive_acceptsETHFromAnyone() public {
-        uint256 balanceBefore = address(rewards).balance;
+    function test_bareETH_reverts() public {
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         (bool ok,) = address(rewards).call{value: 0.5 ether}("");
-        assertTrue(ok);
+        assertFalse(ok);
+    }
+
+    function test_fundRewards_acceptsETHWithLabel() public {
+        uint256 balanceBefore = address(rewards).balance;
+        vm.deal(alice, 1 ether);
+        vm.expectEmit(true, false, false, true, address(rewards));
+        emit Rewards.RewardsFunded(alice, 0.5 ether, "donation");
+        vm.prank(alice);
+        rewards.fundRewards{value: 0.5 ether}("donation");
         assertEq(address(rewards).balance, balanceBefore + 0.5 ether);
+    }
+
+    function test_fundRewards_revertsOnZeroValue() public {
+        vm.prank(alice);
+        vm.expectRevert(Rewards.EmptyContribution.selector);
+        rewards.fundRewards("donation");
+    }
+
+    function test_fundRewards_revertsOnEmptyPurpose() public {
+        vm.deal(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(Rewards.EmptyPurpose.selector);
+        rewards.fundRewards{value: 0.1 ether}("");
+    }
+
+    function test_fundRewards_acceptsFromAnySender() public {
+        uint256 balanceBefore = address(rewards).balance;
+        vm.deal(bob, 1 ether);
+        vm.prank(bob);
+        rewards.fundRewards{value: 0.2 ether}("contributor-bob");
+        assertEq(address(rewards).balance, balanceBefore + 0.2 ether);
     }
 
     // ============ ownership ============

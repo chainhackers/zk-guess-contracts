@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/GuessGame.sol";
+import {Rewards} from "../src/Rewards.sol";
 import {AlwaysAcceptVerifier} from "./mocks/AlwaysAcceptVerifier.sol";
 import {RevertingVerifier} from "./mocks/RevertingVerifier.sol";
 
@@ -36,7 +37,9 @@ contract NotAMixer is Test {
         creator = makeAddr("creator");
         guesser = makeAddr("guesser");
         guesser2 = makeAddr("guesser2");
-        treasury = makeAddr("treasury");
+        // Phase C requires the treasury to be a real Rewards contract — forfeitPuzzle
+        // routes collateral through Rewards.fundRewards("forfeit-collateral-routing").
+        treasury = address(new Rewards(address(this)));
 
         vm.deal(creator, 100 ether);
         vm.deal(guesser, 100 ether);

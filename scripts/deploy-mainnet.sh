@@ -4,11 +4,25 @@ set -e
 
 source .env
 
+if [ -z "$OWNER" ]; then
+    echo "ERROR: OWNER env var is required (operator address; must differ from DEPLOYER_ADDRESS)." >&2
+    exit 1
+fi
+if [ -z "$DEPLOYER_ADDRESS" ]; then
+    echo "ERROR: DEPLOYER_ADDRESS env var is required." >&2
+    exit 1
+fi
+if [ "${OWNER,,}" = "${DEPLOYER_ADDRESS,,}" ]; then
+    echo "ERROR: OWNER must differ from DEPLOYER_ADDRESS — Phase B three-role separation." >&2
+    exit 1
+fi
+
 echo "==================================="
 echo "  MAINNET DEPLOYMENT - USE CAUTION"
 echo "==================================="
 echo ""
-echo "Deployer: $DEPLOYER_ADDRESS"
+echo "Deployer (deploys impls; never owns):  $DEPLOYER_ADDRESS"
+echo "Owner    (operator, post-deploy admin): $OWNER"
 echo ""
 read -p "Proceed with mainnet deployment? (yes/no): " confirm
 if [ "$confirm" != "yes" ]; then
@@ -16,10 +30,16 @@ if [ "$confirm" != "yes" ]; then
     exit 0
 fi
 
+DEPLOYER_KEYSTORE="$HOME/.zkguess-keystores/zkg-deployer"
+if [ ! -f "$DEPLOYER_KEYSTORE" ]; then
+    echo "ERROR: deployer keystore not found at $DEPLOYER_KEYSTORE" >&2
+    exit 1
+fi
+
 forge script script/Deploy.s.sol \
   --rpc-url $BASE_RPC_URL \
   --chain 8453 \
-  --account deployer \
+  --keystore "$DEPLOYER_KEYSTORE" \
   --sender $DEPLOYER_ADDRESS \
   --broadcast \
   --verify \
@@ -50,7 +70,7 @@ if [ -f "$BROADCAST" ]; then
             --chain base --verifier etherscan --etherscan-api-key "$ETHERSCAN_API_KEY" --watch || true
         forge verify-contract "$REWARDS_ADDR" src/Rewards.sol:Rewards \
             --chain base --verifier etherscan --etherscan-api-key "$ETHERSCAN_API_KEY" \
-            --constructor-args "$(cast abi-encode 'constructor(address)' $DEPLOYER_ADDRESS)" --watch || true
+            --constructor-args "$(cast abi-encode 'constructor(address)' $OWNER)" --watch || true
     fi
 else
     echo "Warning: broadcast log not found at $BROADCAST"

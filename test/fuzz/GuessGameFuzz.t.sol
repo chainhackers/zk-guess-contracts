@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../src/GuessGame.sol";
+import {Rewards} from "../../src/Rewards.sol";
 import "../../src/generated/GuessVerifier.sol";
 
 /**
@@ -54,7 +55,7 @@ contract GuessGameFuzz is Test {
 
     function setUp() public {
         verifier = new Groth16Verifier();
-        treasury = makeAddr("treasury");
+        treasury = address(new Rewards(address(this)));
         game = deployGameProxy(address(verifier), treasury);
 
         creator = makeAddr("creator");
