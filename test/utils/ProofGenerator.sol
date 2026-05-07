@@ -6,8 +6,8 @@ import "forge-std/Test.sol";
 /**
  * @title ProofGenerator
  * @notice Abstract contract providing FFI-based ZK proof generation for v2 circuit tests.
- * @dev Drives Node.js + snarkjs against the dev artifacts at circuits/guess.wasm and
- *      circuits/guess_dev.zkey to produce real Groth16 proofs that satisfy the v2 verifier.
+ * @dev Drives Node.js + snarkjs against the ceremony artifacts at circuits/guess.wasm and
+ *      circuits/guess_final.zkey to produce real Groth16 proofs that satisfy the v2 verifier.
  */
 abstract contract ProofGenerator is Test {
     /**

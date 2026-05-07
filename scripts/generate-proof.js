@@ -26,7 +26,7 @@ async function main() {
   const [number, salt, guess, maxNumber, puzzleId, guesser] = args.map((x) => x.toString());
 
   const wasmPath = path.join(__dirname, "../circuits/guess.wasm");
-  const zkeyPath = path.join(__dirname, "../circuits/guess_dev.zkey");
+  const zkeyPath = path.join(__dirname, "../circuits/guess_final.zkey");
 
   if (!fs.existsSync(wasmPath)) {
     console.error(`WASM file not found: ${wasmPath}`);

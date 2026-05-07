@@ -1,6 +1,8 @@
-BUILD=dev
-WARNING: Single-contributor dev setup, NOT a trusted-setup ceremony. Do not deploy the derived GuessVerifier.sol to mainnet. Shipping artifacts will be copied separately after the phase-2 ceremony produces guess_final.zkey.
-SOURCE_REPO=chainhackers/zk-guess-circuits
-SOURCE_SHA=a4236e24ea68882ab33746d3b6208b1a577086a9
-SOURCE_DESCRIBE=a4236e2
-COPIED_AT=2026-04-25T13:42:24Z
+BUILD=ceremony
+SOURCE=https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony
+CEREMONY=phase-2 multi-party trusted setup
+CONTRIBUTORS=5 (chainhacker, darkliv, madco, codejedi, kinco)
+BEACON=Bitcoin block 947059, 2^10 iterations
+SEALED=2026-04-28
+VKEY_SHA256=2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179
+COPIED_AT=2026-05-07T13:00:00Z

@@ -131,8 +131,8 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         emit ProjectMetadata(
             "https://zk-guess.chainhackers.xyz",
-            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0",
-            "", // vkeyChecksum: filled in after the phase-2 ceremony produces guess_final.zkey
+            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony",
+            "2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179", // sha256 of verification_key.json
             "" // auditUrl: filled in after first published audit
         );
     }
