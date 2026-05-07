@@ -7,8 +7,10 @@
  * Circuit inputs:  number, salt, guess, maxNumber, puzzleId, guesser
  * Public signals:  [commitment, isCorrect, guess, maxNumber, puzzleId, guesser]
  *
- * Artifacts: dev build copied from chainhackers/zk-guess-circuits via
- * `bun run copy-to-contracts`. See circuits/BUILD_INFO.txt for the source SHA.
+ * Artifacts: phase-2 ceremony-final wasm + zkey from
+ * chainhackers/zk-guess-circuits release `v2-ceremony` (5 contributors +
+ * BTC block 947059 beacon, sealed 2026-04-28). See circuits/BUILD_INFO.txt
+ * for the full attestation.
  */
 
 const snarkjs = require("snarkjs");
