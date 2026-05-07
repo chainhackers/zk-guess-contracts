@@ -1,293 +1,206 @@
-# Clean-Redeploy Anti-Mixer Design
+# Anti-Mixer Redeploy — As Built
 
-**Date:** 2026-04-23
-**Status:** Draft → ready for implementation, partially shipped (Phase A in progress via circuits #9 + contracts PR #41)
-**Related:** umbrella issue #39 (this repo), umbrella roadmap #10 (`chainhackers/zk-guess-circuits`)
+**Status:** Shipped 2026-05-05 to Base mainnet (block 45605232).
+**Issue:** [#39](https://github.com/chainhackers/zk-guess-contracts/issues/39) (umbrella tracker for the v2 redeploy).
+**Related PRs:** #41 (C0 v2 circuit wiring) · #42 (this doc — original
+pre-implementation draft, since superseded by the contents below) · #43
+(Phase C contract hardening) · #44 (Phase B/D wallet topology + deploy
+script + v2 deploy).
+**Original draft:** preserved in git history at commits `6ca5bc9` (created
+2026-04-26) and `b9af930` (PR #42 review revision). Read that for the
+pre-implementation perspective; this document reflects what actually shipped.
 
 ## Context
 
-The current Base mainnet deployment of zk-guess (`GuessGame` proxy `0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590`, `Rewards` `0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c`, `GuessVerifier` `0xface0e73719e78e3bb020001fd10b62af9b3b6b8`) has drawn auditor / scanner concern because its bytecode-level shape overlaps with Tornado-class mixers: Groth16 verifier, payable deposits from many addresses, payouts "appearing" after a proof, ETH-only flows. Clustering heuristics (Blockaid's, likely others) cannot read the circuit and cannot distinguish "I know preimage of commitment to a number" from "I know preimage of a Merkle leaf."
+The v1 zk-guess deployment on Base mainnet drew Blockaid clustering attention
+because its bytecode-level shape (Groth16 verifier + payable deposits +
+ETH-only flows) overlaps with Tornado-class mixers. A file-by-file review
+confirmed the protocol is **structurally non-mixer** — payout recipients are
+fixed at deposit time, deposit→payout linkage is preserved in events, no
+set-membership proofs, variable denominations, N-to-1 economics. The clustering
+hit was driven by two things a static analyzer can read but the circuit
+semantics it cannot: (a) on-chain signals were insufficiently legible —
+unlabeled `treasury.call{value:...}("")` wires and a bare `Rewards.receive()`
+that accepted any ETH; (b) the deployer/owner/funding/playtest graph was
+monolithic (a single EOA `0x4c7AE65565a8DF70cbAB1b8a504c56E39da59B7A`).
 
-A file-by-file review of the current contract confirms the protocol is **already structurally non-mixer**: payout recipients are never user-supplied; deposit→payout linkage is preserved in events; no set-membership proofs; variable denominations; N-to-1 economics; forfeits are permissionless with a 1-day public time guard. The problem is two-fold:
+v2 redeploys the entire stack from a fresh deployer with hardened code, a
+three-role wallet split, a regenerated verifier from a public phase-2
+ceremony, and labeled event coverage. v1 had 3 puzzles / 0 challenges
+lifetime, so migration is a one-shot `settleAll` (Phase F, still pending at
+the time of this writing).
 
-1. **On-chain signals are insufficiently legible** — events lack identifiers a clustering heuristic can use to confirm linkage; some funds flow through a bare `treasury.call{value: ...}("")` that looks indistinguishable from any other ETH wire; `Rewards` has an unlabeled `receive()` that accepts any ETH.
-2. **The deployer/owner/funding graph is monolithic** — one EOA `0x4c7AE65565a8DF70cbAB1b8a504c56E39da59B7A` is deployer, owner, and funding source, and the same address has played the game (created puzzles, submitted guesses). The contract is taintable on day zero via creation graph alone, and Blockaid's heuristic can't separate "operator playing their own game" from "operator using their own contract to anonymize funds."
+## Deployed contracts (Base mainnet)
 
-**Goal**: redeploy the entire stack from a new deployer, with hardening code changes, split wallet roles, a materially different circuit + verifier, and submit to Blockaid + Basescan before any flag accumulates against the new addresses. Treat existing deployment as v1; one-shot migrate (it has 3 puzzles, 0 challenges lifetime — effectively free).
+| Contract           | Address                                                                                                                       | Deploy tx                                                                                                                              |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| GuessGame proxy    | [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)        | [`0x1aec873d…`](https://basescan.org/tx/0x1aec873dc1a07fce5b7080dfd4d63af426b9dcc6a5559dd978d6bd58d0c3d264)                              |
+| GuessGame impl     | [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)        | [`0x3fee9e89…`](https://basescan.org/tx/0x3fee9e89977b16dc9e2d9be1f993640d56f526fee7859e5d6ee15d6f1323602c)                              |
+| Verifier (Groth16) | [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C)        | [`0xdf65019a…`](https://basescan.org/tx/0xdf65019ab799bebeb08dd00f91334273ec0e9215106b029fa2f510db200ab780)                              |
+| Rewards            | [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F)        | [`0x46444866…`](https://basescan.org/tx/0x4644486635022aa671b2cfef3f615624c098706fb4a952c116ba2c05c595061b)                              |
 
-## Goals
+All four contracts verified on Sourcify and Basescan during the deploy run
+(`forge script ... --verify --verifier sourcify` plus a post-deploy Basescan
+verification pass).
 
-- **Replace every signal a clustering heuristic could match against the v1 deployment**: new code, new bytecode (verifier + game), new addresses, new wallet roles. Anything that survives is intentional and documented.
-- **Make non-mixer structure machine-legible**: every inbound ETH labeled, every payout linked to its triggering challenge in events, every "discretionary" path replaced with a deterministic state machine.
-- **Document the threat model** so the Blockaid `verifiedProject` submission lands with a clear, falsifiable explainer of why this isn't a mixer.
-- **Preserve game logic semantics** — players' funds, the forfeit deadline, the prize math, the proof shape, all unchanged from a player's perspective. Migration is one-shot, no in-flight state to preserve.
+## Wallet roles (three-role separation)
 
-## Non-goals
+| Role     | Address                                                                                                                       | Constraint                                                                                                          |
+|----------|-------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| Deployer | [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d)        | Deploys contracts; **never** holds ownership; retained for future impl redeploys (UUPS upgrades), not retired.       |
+| Funding  | [`0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865`](https://basescan.org/address/0x0eE9931E50aaD6fB6Fb42BB61B8c2fCA6d757865)        | Single KuCoin withdrawal as inbound source; funds deployer, operator, and boost.xyz incentive campaigns; never plays. |
+| Operator | [`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4)        | `owner()` of `GuessGame` proxy and `Rewards`; calls `pause`, `publishRoot`, `settleNext`, `settleAll`; never plays.   |
 
-- **Safe multisig on owner.** The operator wallet stays an EOA for v2; multisig is Phase G follow-up. Adding it now stretches the timeline and the current owner surface (`pause`, `publishRoot`, `settleNext`) doesn't justify multisig friction.
-- **Upgrading the v1 deployment in place.** v2 stays UUPS-upgradeable, but we are NOT reusing the v1 proxy. Clean redeploy means a brand-new proxy + impl + verifier; settling the v1 proxy and pointing the frontend at the new addresses is the cutover (see §"Why a redeploy and not an upgrade" below).
-- **External audit of the rewrite.** Tracked as Phase G; landing one is a strong legitimacy marker but not a blocker for v2.
-- **Designing the off-chain rewards rules engine.** Done in `chainhackers/zk-guess-rewards` and `scripts/rewards/compute-epoch.ts`; orthogonal to this redeploy.
-- **Changing the proof system.** Still Groth16 over BN254; only the circuit's public inputs and one constant change.
-
-## Why a redeploy and not an upgrade
-
-UUPS would let us upgrade in place, but:
-
-1. The v1 deployer/owner/funding monolith taints the contract via creation graph regardless of upgrades. New bytecode through the same proxy doesn't move that graph.
-2. The verifier address is referenced inside `GuessGame` storage. A new circuit needs a new verifier, which needs to be reachable via that address. Re-pointing storage is doable but the v1 `GuessVerifier` bytecode would still be on-chain and forever in the v1 deployment graph.
-3. v1 has 3 puzzles, 0 challenges, 0 ETH locked — migration cost is one `settleAll` call.
-4. The Blockaid clustering hit is against the deployment graph, not the current implementation. A fresh deployer breaks the cluster.
-
-## Coverage audit
-
-Every piece of advice from the brainstorming session, with how it's addressed in this design:
-
-| # | Advice | Status | Where addressed |
-|---|---|---|---|
-| 1 | Mixer-shape concern is the dominant signal | Acknowledged as core motivation | This doc |
-| 2 | New deployer (day-zero taint via creation graph) | Adopted | Phase B |
-| 3 | Operator never plays | Adopted (operational rule + disclosed) | Phase B + SECURITY.md |
-| 4 | Operator doesn't trigger forfeits | Already true — `forfeitPuzzle` is permissionless, 1-day guard | Verified; preserved |
-| 5 | Player-pulled forfeits with public time guard | Already true — `claimFromForfeited` is `msg.sender`-only | Verified; preserved |
-| 6 | Sweep-to-treasury after longer timeout | Adopted — new `sweepStaleBounty(puzzleId)` after `RESPONSE_TIMEOUT + 90d` | Phase C |
-| 7 | Bytecode mixer topology unavoidable with Groth16 + ETH | Acknowledged — compensated by structural differentiators | This doc |
-| 8 | Recipient never user-supplied | Already true (only `msg.sender` or state-derived) | Verified |
-| 9 | No admin function that redirects payouts / no claim-on-behalf | Already true | Verified |
-| 10 | Deposit→payout linked in events | Adopted — `PuzzleSolved` gets indexed `challengeId`. (`ForfeitClaimed` already includes `amount` today at `IGuessGame.sol:96`.) | Phase C4 |
-| 11 | Variable denominations — never add a standard pool | Adopted as standing rule | SECURITY.md |
-| 12 | N-to-1 economics | Already true (many losing stakes → one winner) | Preserved |
-| 13 | Verify both contracts on Basescan with full source + `@notice` | Adopted | Phase C (NatSpec) + Phase D |
-| 14 | Publish circuit source + verifying key + link from NatSpec | Adopted — circuits Release + `@custom:circuit-repo` tag | Phase A + Phase C |
-| 15 | Basescan public label via nametag | Adopted | Phase D |
-| 16 | Blockaid `verifiedProject` submission with explainer | Adopted | Phase D + `docs/security/not-a-mixer.md` |
-| 17 | Pre-disclose forfeit mechanism to Blockaid | Adopted | Phase D submission body |
-| 18 | Separate funding wallet from deployer from operator; none plays | Adopted | Phase B |
-| 19 | Fresh trusted-setup ceremony alone gives different verifier bytecode | Acknowledged — but ship semantic changes too | Phase A |
-| 20 | Bind proof to `puzzleId` (replay protection) | Adopted | Phase A (circuits) — shipped in `circuits#9` |
-| 21 | Explicit range checks on `guess` | Adopted | Phase A — shipped in `circuits#9` |
-| 22 | Domain-separate commitment hash | Adopted | Phase A — shipped in `circuits#9` |
-| 23 | Optional: bind `guesser` address into proof | Adopted (shipped despite being marked optional) | Phase A — shipped in `circuits#9` |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Off-chain (cold storage)                      │
-│   ┌──────────────┐  ┌─────────────┐  ┌──────────────────────┐   │
-│   │ deployer-v2  │  │   funding   │  │      operator        │   │
-│   │ (one-shot,   │  │ (CEX-       │  │  (proxy owner,       │   │
-│   │  retired)    │  │  withdraw   │  │   pause, publishRoot,│   │
-│   │              │  │  only)      │  │   settleNext)        │   │
-│   └──────┬───────┘  └──────┬──────┘  └──────────┬───────────┘   │
-│          │ deploy           │ fund               │ admin         │
-│          ▼                  ▼                    ▼               │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │              Base mainnet (post-deploy)                 │     │
-│  │                                                         │     │
-│  │  ┌─────────────┐    treasury    ┌──────────────────┐   │     │
-│  │  │  GuessGame  │─────────────▶ │     Rewards      │   │     │
-│  │  │  (proxy)    │  forfeit slash │  fundRewards()   │   │     │
-│  │  └──────┬──────┘                │  publishRoot()   │   │     │
-│  │         │ verifyProof           │  claim(proof)    │   │     │
-│  │         ▼                       └──────────────────┘   │     │
-│  │  ┌─────────────┐                                        │     │
-│  │  │  Verifier   │  ← regenerated from v2 ceremony zkey  │     │
-│  │  │  (Groth16)  │                                        │     │
-│  │  └─────────────┘                                        │     │
-│  └────────────────────────────────────────────────────────┘     │
-│                           │                                      │
-│                           │ events                               │
-│                           ▼                                      │
-│              ┌─────────────────────────┐                         │
-│              │  HyperIndex GraphQL      │                        │
-│              │  (Puzzle, Challenge,     │                        │
-│              │   RewardEpoch, ...)      │                        │
-│              └─────────────────────────┘                         │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Address graph after deploy:**
-- Deployer: a fresh keypair, gets exactly enough ETH from `funding` to deploy, broadcasts ≤2 txs (one for each contract + initialize), transfers ownership to `operator`, then is retired forever. Public attestation: "this address only ever deploys."
-- Funding: gets ETH from a named CEX (Coinbase/Kraken) withdrawal, never plays, never deploys, only sends ETH to the deployer (gas) and to `Rewards.fundRewards()` (pool top-ups, when needed).
-- Operator: gets gas from funding; calls `pause`, `publishRoot`, `settleNext`/`settleAll`; never plays.
-- The historical address `0x4c7AE6...9B7A` (current monolithic) is documented in `SECURITY.md` as a playtest account from the v1 era; not a v2 role.
+Full per-address provenance graph (KuCoin → funding → deployer/operator with
+all transaction hashes) is in
+[`docs/security/wallet-topology.md`](../../security/wallet-topology.md).
 
 ## Phase A — Circuit v2 (`chainhackers/zk-guess-circuits`)
 
-**Status: implemented; pending merge.** Circuits PR #9 is merged. Contracts PR #41 wires the new `[6]` public-signal shape into `respondToChallenge` and is open at the time of writing — `main` still carries the v1 `[4]` flow until that PR lands.
+Four circuit changes shipped via circuits#9, each on top of v1 (`Poseidon([number, salt])` commitment, public signals `[commitment, isCorrect, guess, maxNumber]`):
 
-Four circuit changes, each on top of v1 (`Poseidon([number, salt])` commitment, public signals `[commitment, isCorrect, guess, maxNumber]`):
-
-1. **Bind `puzzleId` as a public input.** Public signals become `[commitment, isCorrect, guess, maxNumber, puzzleId, ...]`. Forced into the constraint system via `puzzleIdSquared <== puzzleId * puzzleId`. Prevents a valid proof being replayable against any other puzzle that happens to share the same commitment.
-2. **Bind `guesser` as a public input** (originally optional, shipped because cheap). Same idiom on a uint160 field element. Prevents a third party from front-running someone else's proof submission with their own `msg.sender`.
-3. **Range-check `guess`** in-circuit (`1 <= guess <= maxNumber`) using two 16-bit comparators, mirroring the existing constraints on `number`. Game-well-formedness moves from UI-trusted to proof-layer-guaranteed.
-4. **Domain-separate the commitment**: `Poseidon([DOMAIN_TAG, number, salt])` where `DOMAIN_TAG = keccak256("zkguess.v2") mod p(BN254) = 6000605569458108169701754207643449997818461959397281845176039583157698733685` (hard-coded constant). v1 commitments cannot collide with v2 under any future composition.
+1. **Bind `puzzleId`** as a public input — prevents proof replay across puzzles that happen to share a commitment.
+2. **Bind `guesser`** address — prevents a third party front-running someone else's proof submission.
+3. **Range-check `guess`** in-circuit (`1 ≤ guess ≤ maxNumber`) — game well-formedness is now proof-layer-guaranteed instead of UI-trusted.
+4. **Domain-separate the commitment** via `Poseidon([DOMAIN_TAG, number, salt])` where `DOMAIN_TAG = keccak256("zkguess.v2") mod p(BN254)`. v1 commitments cannot collide with v2 under any future composition.
 
 Final v2 public signals: `[commitment, isCorrect, guess, maxNumber, puzzleId, guesser]` (6 entries).
 
-**Trusted-setup v2:** Fresh phase-2 ceremony with ≥3 independent contributors + a drand/Bitcoin block beacon. Tracked in `chainhackers/zk-guess-circuits/tasks/trusted-setup-v2.md`. Until the ceremony lands, contracts repo carries dev-build artifacts (`guess_dev.zkey`, `BUILD_INFO.txt` clearly marked `BUILD=dev`) for testing/preview only. The deployed mainnet `GuessVerifier.sol` is regenerated from the post-ceremony `guess_final.zkey`.
+The verifier was regenerated from a phase-2 trusted-setup ceremony, sealed
+2026-04-28 by Bitcoin block 947059 (2¹⁰ iterations) with 5 human contributors
+([@chainhacker](https://farcaster.xyz/chainhacker),
+[@darkliv](https://farcaster.xyz/darkliv),
+[@madco](https://farcaster.xyz/madco),
+[@codejedi](https://farcaster.xyz/codejedi),
+[@kinco](https://farcaster.xyz/kinco)). Per-contribution hashes, the final
+zkey, the per-contributor intermediate zkeys, the `verification_key.json`, and
+the `snarkjs zkey verify` output are all published as
+[`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony).
 
-**Artifact release:** GitHub Release at `chainhackers/zk-guess-circuits/releases/tag/v2.0.0` with `circuit.r1cs`, `circuit.wasm`, `verification_key.json`, `guess_final.zkey`, and `MANIFEST.sha256`. Reproducibility is the legitimacy marker.
+**Divergence from original draft:** the release tag is `v2-ceremony`, not the
+originally-planned `v2.0.0`. The on-chain `ProjectMetadata` event emitted at
+`initialize` (Phase C7 below) still carries the stale `circuitRepo=v2.0.0`
+URL pointing at the non-existent tag — to be corrected in the next impl
+upgrade.
 
-## Phase B — Wallet topology (three-role separation)
+## Phase B — Wallet topology
 
-Generate three fresh keypairs. None ever creates a puzzle, submits a guess, or claims a reward. All three documented in `SECURITY.md`.
+Three keypairs generated 2026-05-03; funded 2026-05-05 from a single 0.05 ETH
+KuCoin withdrawal (`0x2bdb477c…`). The deploy script (`script/Deploy.s.sol`)
+enforces the three-role separation in code, not just operationally:
 
-| Role | Purpose | Provenance requirement |
+- Reads `OWNER` and `DEPLOYER_ADDRESS` from env.
+- `require(owner != deployer, "Deploy: OWNER must differ from DEPLOYER_ADDRESS")`.
+- `vm.startBroadcast(deployer)` — Foundry refuses to broadcast unless the loaded keystore matches the env-supplied deployer address, catching misconfigured `--keystore`/`--account`/`--private-key` flags loudly at runtime.
+
+**Divergence from original draft:** owner is passed directly to the `Rewards`
+constructor and `GuessGame.initialize`, so the deployer EOA never holds
+ownership at any point. The originally-planned post-deploy
+`transferOwnership(operator)` call is unnecessary and not used.
+
+**Divergence from original draft:** funding source is KuCoin, not Coinbase
+or Kraken — the latter two don't operate in the operator's jurisdiction
+(Russia). Disclosure principle ("named, regulated CEX, single hop, no DEX
+swaps, no contract intermediaries on the inbound path") is preserved.
+
+## Phase C — Contract hardening
+
+| # | Change | PR |
 |---|---|---|
-| **Deployer** (`deployer-v2`) | One-shot: deploys `GuessVerifier` + `Rewards` + `GuessGame` impl + `ERC1967Proxy`, calls `initialize`, `transferOwnership(operator)`. Retired immediately. | Funded only with exact-gas amount (≤0.01 ETH) from the funding wallet. No other history before or after. |
-| **Funding** (`funding`) | Seeds `Rewards` via `fundRewards(purpose)`, tops up boost.xyz campaigns, pays operator gas. | Funded directly from a named CEX withdrawal (Coinbase / Kraken). No DEX swaps, no mixer-adjacent path in the actor graph. |
-| **Operator** (`operator`) | Owner of both contracts post-deploy. Calls `pause()`, `publishRoot()`, `settleNext()`, `settleAll()`. | Funded by funding wallet with modest gas. No history of puzzle creation or guessing. |
+| **C0** | v2 circuit wiring: `respondToChallenge` takes `uint256[6]` pubSignals and validates `_pubSignals[4] == puzzleId` + `_pubSignals[5] == uint160(guesser)` before the `verifyProof` pairing call (saves ~200k gas on malformed/replayed submissions). | #41 |
+| **C1 + C2** | Removed `Rewards.receive()` and `fallback()`; gated funding through `fundRewards(string purpose) external payable` emitting `RewardsFunded(funder, amount, purpose)`. `GuessGame.forfeitPuzzle` routes collateral via `fundRewards("forfeit-collateral-routing")`. | #43 |
+| **C3** | `sweepStaleBounty(puzzleId)` permissionless after `RESPONSE_TIMEOUT + CLAIM_TIMEOUT` (1 day + 90 days); routes unclaimed bounty to `Rewards` via `fundRewards("stale-bounty-sweep")`. | #43 |
+| **C4** | `PuzzleSolved` adds indexed `challengeId`. `ForfeitClaimed` already carried `amount` from v1. | #43 |
+| **C5** | Queue-based settlement: `EnumerableSet _potentiallyOwed` auto-populated on every user interaction, `settleNext(n, reason)` + `settleAll(reason)` + `canSettle()` precondition (paused + every puzzle terminal + claim windows elapsed). Owner cannot single out, omit, or reorder recipients. | #43, #44 |
+| **C6** | NatSpec coverage: `@title`, `@notice`, `@custom:security-contact`, `@custom:circuit-repo`, `@custom:homepage`, `@custom:commitment-domain`, plus post-Cancun SELFDESTRUCT-aware wording on `Rewards`. | #43, #44 |
+| **C7** | `ProjectMetadata(homepage, circuitRepo, vkeyChecksum, auditUrl)` one-shot event emitted at `initialize`. | #43 |
 
-**Operational rule:** the operator never plays the game. If the operator wants to play, use a separate wallet — disclosed in `SECURITY.md` and unlinked from operator funding.
+**C5 divergence — `MAX_DUST` cap.** PR #43 added a `MAX_DUST = 10000`
+defense-in-depth cap in `settleAll`: if residual contract balance exceeded
+the cap, finalization reverted with `ExcessiveDust(amount)`. PR #44 round-2
+review **removed** the cap. On Cancun an attacker can force ETH into any
+contract via `SELFDESTRUCT` (EIP-6780 nerfs deletion but still routes the
+value transfer); pushing dust above the cap for ~10001 wei + gas would have
+permanently bricked finalization. Liveness > bug detection. The post-route
+`BalanceMismatch` check still proves correctness (balance must be 0 after
+the route); the `dust` field on the `Settled` event lets indexers flag
+unusually large amounts for off-chain reconciliation.
 
-## Phase C — Contract code changes (this repo)
+**C7 known gap.** The launch deploy emitted `ProjectMetadata` with blank
+`vkeyChecksum`, blank `auditUrl`, and a stale `circuitRepo=v2.0.0` URL
+(pointing at a non-existent tag — the actual ceremony release is
+`v2-ceremony`). Off-chain readers should treat
+[`docs/security/not-a-mixer.md`](../../security/not-a-mixer.md) and
+[`SECURITY.md`](../../../SECURITY.md) as the canonical pointers. To be
+corrected in the next impl upgrade.
 
-All on a new feature branch from main. New proxy + new impl + new `Rewards` + new `GuessVerifier`; no upgrade of the v1 UUPS proxy.
+## Phase D — Deploy / verify / submit
 
-### C0. v2 circuit wiring — **shipped via PR #41**
+Deployed 2026-05-05, block 45605232 (per-contract tx hashes in the deployed
+addresses table above). All four contracts verified on Sourcify + Basescan
+during the deploy script.
 
-`respondToChallenge` takes `uint256[6]` public signals and validates `_pubSignals[4] == puzzleId` (`InvalidPuzzleIdBinding()`) and `_pubSignals[5] == uint256(uint160(challenge.guesser))` (`InvalidGuesserBinding()`). All cheap pubSignals equality checks now run before the expensive `verifyProof` pairing call (saves ~200k gas on malformed/replayed submissions).
+**Pending sub-items** (tracked on issue #39):
 
-### C1. `Rewards.sol`: gate funding
+- Blockaid `verifiedProject` filing at <https://report.blockaid.io/verifiedProject>. Submission body is the TL;DR section of [`docs/security/not-a-mixer.md`](../../security/not-a-mixer.md).
+- Basescan name-tag "ZK Guess Game" submission for the proxy.
+- ENS registration `zkguess.chainhackers.eth` → proxy.
 
-- Remove the bare `receive() external payable`.
-- Add `fundRewards(string calldata purpose) external payable` that emits `RewardsFunded(address indexed funder, uint256 amount, string purpose)`.
-
-Every inbound ETH to `Rewards` now carries a labeled purpose. Scanners see structured intent, not bare wires.
-
-### C2. `GuessGame.sol`: route forfeit collateral through the labeled path
-
-- `forfeitPuzzle` currently does `treasury.call{value: puzzle.collateral}("")`. Change to `Rewards(treasury).fundRewards{value: puzzle.collateral}("forfeit-collateral-routing")`.
-
-The forfeit slash now emits `RewardsFunded(GuessGame, amount, "forfeit-collateral-routing")` on the Rewards side — every wire from the game to the rewards pool is labeled.
-
-### C3. `GuessGame.sol`: add `sweepStaleBounty(uint256 puzzleId)`
-
-- Permissionless. Requires `puzzle.forfeited == true` AND `block.timestamp >= puzzle.lastResponseTime + RESPONSE_TIMEOUT + CLAIM_TIMEOUT` where `CLAIM_TIMEOUT = 90 days`.
-- Computes unclaimed bounty using the existing `challengesClaimed` cumulative divisor.
-- Transfers unclaimed via `Rewards(treasury).fundRewards{value: unclaimed}("stale-bounty-sweep")`.
-- Emits `StaleBountySwept(puzzleId, amount)`.
-
-Turns the "funds sit indefinitely after forfeit if no one claims" surface into a deterministic state machine with a public time guard. No discretion; not redirectable to operator.
-
-### C4. `GuessGame.sol`: enrich traceability events
-
-- `PuzzleSolved(puzzleId, winner, prize)` → add indexed `challengeId`: `PuzzleSolved(uint256 indexed puzzleId, uint256 indexed challengeId, address winner, uint256 prize)`.
-- `ForfeitClaimed` already includes `amount` (`event ForfeitClaimed(uint256 indexed puzzleId, address guesser, uint256 amount)` at `IGuessGame.sol:96`); no change needed.
-
-Zero storage cost. Indexer handler updates accordingly.
-
-### C5. `GuessGame.sol` + `Settleable.sol`: queue-based settlement
-
-Replace the current `settle(address[])` (caller-supplied recipient list) with a deterministic queue, so settlement can never single-out or omit specific addresses.
-
-- Add `EnumerableSet.AddressSet private _potentiallyOwed` (new storage slot; reduce `__gap[50]` → `__gap[49]`).
-- Auto-register `msg.sender` into `_potentiallyOwed` on entry to `createPuzzle`, `submitGuess`, `claimFromForfeited`, `claimStakeFromSolved`, `withdraw`. One SSTORE per user on first interaction; SLOAD-only thereafter.
-- Add `uint256 private _settleCursor`.
-- New view `canSettle() external view returns (bool)`: paused AND every puzzle is terminal (`solved || cancelled || forfeited`) AND every forfeited puzzle has passed `RESPONSE_TIMEOUT + CLAIM_TIMEOUT`.
-- New function `settleNext(uint256 n, string calldata reason) external onlyOwner`:
-  - Requires `canSettle()`.
-  - Advances `_settleCursor` by up to `n`, paying each address whose `_computeOwed(addr) > 0`.
-  - Emits one `SettledBatch(cursorStart, cursorEnd, reason)` plus per-address `SettledPaid(addr, amount)`.
-- Modify `settleAll(string calldata reason)` (no addresses):
-  - Requires `canSettle() && _settleCursor >= _potentiallyOwed.length()`.
-  - Sweeps any dust to treasury via `Rewards(treasury).fundRewards{value: dust}("final-settlement-dust")`.
-  - Marks `settled = true`, renounces ownership.
-
-Owner cannot single out arbitrary recipients; cannot omit recipients; cannot settle while a puzzle is live; cannot settle before the 90-day forfeit-claim window closes.
-
-### C6. NatSpec coverage
-
-- `@title`, `@notice`, `@dev` on both contracts at the contract level.
-- `@notice` on every external function (e.g., "Creates a new puzzle with a hidden number; the creator deposits a bounty and collateral.").
-- `@custom:security-contact security@chainhackers.xyz` on both.
-- `@custom:circuit-repo https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0` on `GuessGame`.
-- `@custom:commitment-domain` on `GuessGame` referencing `DOMAIN_TAG`.
-- `@custom:homepage https://zk-guess.chainhackers.xyz` on both.
-
-Basescan readers see the WHY of every function in plain English without leaving the verified-source page.
-
-### C7. Project-metadata deploy event
-
-In `initialize` (or a new `initV2` call), emit one `ProjectMetadata(string homepage, string circuitRepo, string vkeyChecksum, string auditUrl)`. Audit URL can be empty initially. Indexers and scanners pick it up at deploy time without reading NatSpec.
-
-## Phase D — Deploy, verify, submit
-
-1. **Deploy script update** — `script/Deploy.s.sol` takes `owner` as a parameter (not `msg.sender`). The deployer broadcasts; immediately calls `transferOwnership(operator)` on both contracts in the same script when possible.
-2. **CREATE2 salt (optional)** — current deploy flow is `script/Deploy.s.sol` (regular `CREATE`). If we add a deterministic-deployment script in Phase D (e.g., `script/DeployDeterministic.s.sol` — to be created), pick a salt distinct from v1 (`keccak256("zkguess.v2.2026-04")`). Not a hard requirement; vanity addresses are nice-to-have, not mixer-defense.
-3. **Sourcify + Basescan verification** — `scripts/verify-sourcify.sh` and `scripts/verify-basescan.sh` for all four contracts (`GuessGame` impl, proxy, `Rewards`, `GuessVerifier`).
-4. **Basescan nametag** — submit "ZK Guess Game" + `https://zk-guess.chainhackers.xyz` via the Basescan name-tag form for the proxy address.
-5. **Blockaid `verifiedProject`** — submit at `https://report.blockaid.io/verifiedProject`. Body in `docs/security/not-a-mixer.md`. Required: proxy address, domain, chain (Base mainnet), Basescan-verified source link, circuit repo link, the four-point non-mixer explainer, pre-disclosure of the forfeit mechanism, reputation pointers (Farcaster mini-app listing, boost.xyz campaign, user count), and the threat-model URL.
-6. **ENS** — register `zkguess.chainhackers.eth` (or similar), point to the proxy.
-
-**Non-mixer explainer paragraph** (lives at `docs/security/not-a-mixer.md`, included verbatim in the Blockaid submission):
-
-> zk-guess is a number-guessing game using Groth16 to prove equality of two plaintext values (committed secret = guessed number) while keeping the secret private. Unlike mixers: (1) every payout's recipient is fixed at deposit time — `prize → challenge.guesser`, never user-supplied at withdrawal; (2) deposit→payout linkage is preserved in every event (`puzzleId`, `challengeId`, `winner`); (3) stakes are continuous, not fixed denominations — there is no anonymity set; (4) economics are N-to-1 (many losing stakes fund one winner), the opposite of a mixer's 1-to-1 flow. The forfeit mechanism, which activates if a creator is silent for 24 hours, generates the unusual payout patterns a clustering heuristic may see; it's a deterministic state machine with a public time guard, not discretionary routing.
+**Divergence from original draft:** the originally-considered
+`script/DeployDeterministic.s.sol` (CREATE2 with a custom salt) was not
+pursued — vanity addresses are not a meaningful mixer-defense signal and the
+extra script surface wasn't worth carrying. v2 uses regular `CREATE`.
 
 ## Phase E — Documentation
 
-1. **`SECURITY.md`** at repo root — disclosure contact, bug bounty terms (initial: acknowledgment + credit; monetary later), scope, role disclosure (which addresses play which roles, including the historical playtest account).
-2. **`docs/security/not-a-mixer.md`** — canonical threat model & non-mixer explainer (the paragraph above plus the four points expanded).
-3. **`docs/security/wallet-topology.md`** — the three-role design with provenance of each address.
-4. **`script/rewards/RUNBOOK.md`** — already updated with `BASE_RPC_URL` and `EXPECTED_EPOCH`; will get v2 contract addresses post-deploy.
-5. **Root `README.md`** — v2 addresses, link to `SECURITY.md` and the threat model.
-6. **`docs/superpowers/specs/2026-04-23-clean-redeploy-antimixer-design.md`** — this document.
+- [`SECURITY.md`](../../../SECURITY.md) — disclosure contact, bug-bounty terms, role disclosure (incl. historical v1 monolithic EOA), upgradeability policy, post-Cancun SELFDESTRUCT-aware NatSpec, address registry pointers.
+- [`docs/security/not-a-mixer.md`](../../security/not-a-mixer.md) — canonical four-point Blockaid-submission threat model (recipient fixed at deposit, deposit→payout linkage in events, continuous stakes / no anonymity set, N-to-1 economics) + reproducibility anchors (Sourcify match against the `v2-ceremony` release).
+- [`docs/security/wallet-topology.md`](../../security/wallet-topology.md) — three-role design, full per-address funding provenance, audit subgraph queries.
+- This document.
 
-## Phase F — Migration (one-shot cutover)
+## Phase F — Migration (pending)
 
-Current v1 state: 3 puzzles lifetime, 0 challenges. Migration is effectively free.
+- v1 `settleAll(address[], "migration-to-v2-antimixer")` on
+  [`0xa05ebcf0…`](https://basescan.org/address/0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590)
+  with the 3 v1 puzzle creators. v1 contract seals (`settled = true`).
+- Frontend (`zk-guess` repo) switches `VITE_GAME_ADDRESS` +
+  `VITE_REWARDS_ADDRESS` + commitment `DOMAIN_TAG` to v2 values.
+- Indexer (`zk-guess-indexer` repo) redeployed against v2 addresses; v1
+  indexer archived.
 
-1. Deploy v2 stack from new deployer (Phase D).
-2. On v1 (`0xa05ebc…`): call existing `settleAll(address[], "migration-to-v2-antimixer")` with the creators of the 3 existing puzzles. v1 contract seals (`settled = true`).
-3. Frontend (`zk-guess` repo) switches `VITE_GAME_ADDRESS` + `VITE_REWARDS_ADDRESS` + commitment-domain-tag to v2 values. Announce on Farcaster / boost.xyz.
-4. Indexer (`zk-guess-indexer` repo) re-deployed pointing at v2 addresses; v1 indexer archived.
-5. v1 `Rewards` (`0x3f40…`) — no migration needed; balance is currently 0. New v2 `Rewards` is the live one going forward.
+## Phase G — Deferred (tracked, not blocking)
 
-## Phase G — Follow-ups (deferred, tracked, not blocking)
+- Safe multisig for operator (revisit once v2 is stable).
+- Named-firm audit engagement.
+- GitHub Pages on `chainhackers/zk-guess-rewards` (blocked on
+  private-repo + free-plan decision).
 
-- **Safe multisig for owner.** Revisit once v2 is stable; current owner surface is small (`pause`, `publishRoot`, `settleNext`).
-- **Named-firm audit.** Even a one-day public review is a strong legitimacy marker; pursue after Blockaid response.
-- **GitHub Pages on `chainhackers/zk-guess-rewards`.** Currently blocked by private-repo + free plan. Decide: make repo public, upgrade plan, or move to a different host.
-- **`computeCommitment` Poseidon-only FFI helper.** Test infrastructure speedup; ~21 minutes off integration runs. Out of scope of v2 deploy; cheap follow-up.
-- **Frontend commitment-gen refactor** to use `DOMAIN_TAG` from a shared module. Lives in `chainhackers/zk-guess` repo.
-- **Indexer handler updates** for the enriched event signatures (C4). Lives in `chainhackers/zk-guess-indexer`.
+## Locked decisions (delta from the 2026-04-23 draft)
 
-## Decisions (locked)
-
-1. **Scope**: wallet topology + contract code hardening + legitimacy markers. Safe multisig for owner is **out** of v2 (revisit Phase G).
-2. **Code changes**: gate `Rewards.receive()`, add `sweepStaleBounty`, enrich events, queue-based settlement. No other behavioural changes.
-3. **Owed-set population**: auto-register on every interaction (one SSTORE per user, first-time only). Beats explicit registration.
-4. **Migration**: one-shot cutover. v1 has 3 puzzles, 0 challenges — effectively free.
-5. **Circuit changes**: puzzleId binding + guesser binding + guess range check + domain-separated commitment + fresh phase-2 ceremony + artifact release.
-6. **GitHub issue granularity**: one umbrella issue (#39) with phases as checkboxes; one short list issue in circuits (#10). Per-task md files in circuits repo `tasks/`.
-
-## Open items
-
-- Drafting the final Blockaid non-mixer paragraph from the Phase D first draft. Currently the paragraph above is the working copy.
-- Final wording of `SECURITY.md` bug bounty terms (acknowledgment + credit at minimum; monetary tier TBD).
-- ENS subdomain choice — `zkguess.chainhackers.eth` vs. a separate full domain.
-
-## Implementation status
-
-| Phase | Status |
-|---|---|
-| A — Circuit v2 (puzzleId + guesser binding, range check, domain separation) | **Shipped** in `chainhackers/zk-guess-circuits#9`; consumer wiring in this repo's PR #41 |
-| A — Trusted-setup ceremony | Tracked in `tasks/trusted-setup-v2.md`; not shipped |
-| A — Artifact GitHub Release | Tracked in `tasks/publish-artifacts-release.md`; gated on ceremony |
-| B — Wallet topology generation + funding | Not started |
-| C0 — v2 circuit wiring + fail-fast pubSignals checks | **Shipped** via PR #41 |
-| C1–C7 — Rewards funding gate, forfeit routing, sweep, events, settlement, NatSpec, deploy event | Not started |
-| D — Deploy + verify + Blockaid + nametag + ENS | Not started; gated on Phase B + Phase C |
-| E — Security docs | Not started; can ship in parallel with Phase C |
-| F — Migration | Not started; gated on Phase D |
-| G — Multisig, audit, Pages | Deferred |
+1. **Init-time owner**, not post-deploy `transferOwnership(operator)`.
+   Deployer EOA never holds ownership at any point.
+2. **Deployer keypair retained** for future impl redeploys (UUPS upgrades),
+   not retired after the v2 launch tx batch.
+3. **KuCoin** as funding-source CEX (regional access; Coinbase/Kraken don't
+   operate in Russia). Disclosure principle preserved.
+4. **Release tag `v2-ceremony`**, not `v2.0.0`. On-chain `ProjectMetadata`
+   still references the stale `v2.0.0` URL — to be fixed in the next impl
+   upgrade.
+5. **No CREATE2 / `DeployDeterministic.s.sol`.** Vanity addresses are not a
+   meaningful mixer-defense signal.
+6. **`MAX_DUST` cap dropped** after PR #44 round-2 review (SELFDESTRUCT
+   griefing of finalization). See Phase C5 above.
+7. **Three-role separation enforced in code**
+   (`vm.startBroadcast(deployer)` + `OWNER != DEPLOYER` require), not just
+   operationally.
+8. **v1 cutover deferred** to a separate PR (Phase F). v2 contracts are live
+   independently of v1 sealing.
 
 ## References
 
-- Existing rewards spec: `docs/superpowers/specs/2026-04-18-forfeit-rewards-merkle-distribution-design.md`
-- Umbrella issue (this repo): #39
-- Circuits roadmap issue: `chainhackers/zk-guess-circuits#10`
-- v1 deployment: `GuessGame` proxy `0xa05ebcf0f9aab5194c8a3ec8571a1d85d0a7f590`, `Rewards` `0x3f403b992a4b0a2a8820e8818cac17e6f7cd8c1c`, `GuessVerifier` `0xface0e73719e78e3bb020001fd10b62af9b3b6b8`
-- v1 deployer/owner/funding (monolithic): `0x4c7AE65565a8DF70cbAB1b8a504c56E39da59B7A`
+- [`docs/security/wallet-topology.md`](../../security/wallet-topology.md) — full per-address provenance + audit subgraph queries.
+- [`docs/security/not-a-mixer.md`](../../security/not-a-mixer.md) — canonical Blockaid-submission threat model.
+- [`SECURITY.md`](../../../SECURITY.md) — disclosure + bug bounty + role disclosure.
+- [`chainhackers/zk-guess-circuits` release `v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony) — circuit, final zkey, ceremony transcript.
+- Issue [#39](https://github.com/chainhackers/zk-guess-contracts/issues/39) — umbrella checkbox tracking.
+- [`docs/superpowers/specs/2026-04-18-forfeit-rewards-merkle-distribution-design.md`](./2026-04-18-forfeit-rewards-merkle-distribution-design.md) — predecessor spec covering the v1 `Rewards` design that v2 inherited.
