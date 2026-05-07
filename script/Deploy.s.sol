@@ -40,7 +40,10 @@ contract DeployScript is Script {
         console.log("Deployer (one-shot, retired after this tx):", deployer);
         console.log("Owner (operator, post-deploy admin):       ", owner);
 
-        vm.startBroadcast();
+        // Pin the broadcaster to the env-supplied DEPLOYER_ADDRESS — Foundry will fail
+        // here if the loaded keystore/--private-key doesn't match, preventing a silent
+        // broadcaster/env divergence that would defeat the OWNER vs DEPLOYER guard above.
+        vm.startBroadcast(deployer);
         (Groth16Verifier verifier, Rewards rewards, GuessGame impl, address proxy) = deploy(owner);
         vm.stopBroadcast();
 

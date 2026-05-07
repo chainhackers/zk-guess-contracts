@@ -21,5 +21,6 @@ echo ""
 OWNER="$OWNER" DEPLOYER_ADDRESS="$DEPLOYER_ADDRESS" forge script script/Deploy.s.sol \
   --rpc-url http://localhost:8545 \
   --private-key $ANVIL_DEPLOYER_KEY \
+  --sender $DEPLOYER_ADDRESS \
   --broadcast \
   -vvv

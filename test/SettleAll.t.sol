@@ -260,7 +260,7 @@ contract SettleAllTest is Test {
 
     function test_settleAll_endToEndForfeitFlowDrainsContract() public {
         // End-to-end forfeit-path settlement: forfeit → sweep (freezes accounting) →
-        // settleNext (pays stakes) → settleAll (finalizes; dust must be ≤ MAX_DUST).
+        // settleNext (pays stakes) → settleAll (finalizes; routes residual to treasury).
         address[] memory guessers = new address[](3);
         guessers[0] = makeAddr("g1");
         guessers[1] = makeAddr("g2");
