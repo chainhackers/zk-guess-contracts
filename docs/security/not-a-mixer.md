@@ -170,10 +170,11 @@ funding.
 
 ## Reputation pointers
 
+- Project homepage: https://zk-guess.chainhackers.xyz
+- Blockaid `verifiedProject` filing submitted 2026-05-07 (no public reference issued at submit time; awaiting review)
 - Farcaster mini-app listing: <!-- TODO: URL once submitted -->
 - boost.xyz campaign: <!-- TODO: URL once active -->
 - ENS pointer: `zkguess.chainhackers.eth` <!-- TODO: confirm registered -->
-- Project homepage: https://zk-guess.chainhackers.xyz
 
 ## Bug bounty / disclosure
 
