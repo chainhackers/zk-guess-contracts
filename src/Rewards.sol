@@ -9,7 +9,10 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 ///         labeled donations via fundRewards(purpose).
 /// @dev Non-upgradeable. Owner publishes monotonically-increasing epoch roots; users claim
 ///      by proof. Eligibility rules live off-chain in the indexer. Bare ETH transfers revert
-///      (no `receive`) so every inbound transfer carries a scanner-readable purpose.
+///      (no `receive`/`fallback`); the supported funding path is `fundRewards(purpose)`,
+///      which emits `RewardsFunded` with a scanner-readable label. Non-call inbound balance
+///      changes (e.g., `SELFDESTRUCT`-forced ETH or pre-deploy address funding) cannot be
+///      prevented by any contract on the EVM and are reconciled off-chain.
 /// @custom:repository https://github.com/chainhackers/zk-guess-contracts
 /// @custom:homepage https://zk-guess.chainhackers.xyz
 /// @custom:security-contact security@chainhackers.xyz

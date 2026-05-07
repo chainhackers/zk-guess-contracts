@@ -67,10 +67,13 @@ deposit→payout edge in one query:
 - `PuzzleSolved(puzzleId indexed, challengeId indexed, winner, prize)` — winner is the
   guesser of `challengeId`; the indexed `challengeId` makes this trivially queryable.
 - `ForfeitClaimed(puzzleId, guesser, amount)`
-- `RewardsFunded(funder indexed, amount, purpose)` — every inbound ETH to the rewards
-  pool carries a labeled string purpose (`"forfeit-collateral-routing"`,
+- `RewardsFunded(funder indexed, amount, purpose)` — every call-path inbound ETH to the
+  rewards pool carries a labeled string purpose (`"forfeit-collateral-routing"`,
   `"stale-bounty-sweep"`, `"final-settlement-dust"`, or a donor-supplied label). There
-  is no bare `receive()` on `Rewards`; ETH cannot enter without a label.
+  is no `receive()`/`fallback()` on `Rewards`, so plain ETH transfers revert and the
+  only supported funding path is `fundRewards(purpose)`. Non-call balance changes
+  (`SELFDESTRUCT`-forced ETH, pre-deploy address funding) cannot be prevented by any
+  EVM contract; they are reconciled off-chain by the indexer.
 
 Mixers deliberately break this linkage — that is the entire feature. zk-guess
 deliberately preserves it.

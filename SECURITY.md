@@ -26,10 +26,13 @@ Out-of-scope (these are known properties, not vulnerabilities):
 
 - The `_potentiallyOwed` queue is auto-populated; users cannot unsubscribe. This is
   intentional — the owner cannot omit recipients from settlement.
-- `ForfeitedClaimed` recipients pay only their own gas; there is no relayer.
+- `ForfeitClaimed` recipients pay only their own gas; there is no relayer.
 - `Rewards.claim` requires the caller to be the leaf address; no claim-on-behalf.
-- The owner can `pause` the contract. Pausing blocks new puzzles, new guesses, and new
-  forfeits, but does not block any user-initiated payout (`withdraw`,
+- The owner can `pause` the contract. Pausing blocks new puzzles and new guesses (the
+  two `whenNotPaused`-gated entry points). It does **not** block `forfeitPuzzle`,
+  `respondToChallenge`, or `cancelPuzzle` — these remain callable while paused so the
+  permissionless time-guarded forfeit path and the creator's response window cannot be
+  censored. It also does not block any user-initiated payout (`withdraw`,
   `claimFromForfeited`, `claimStakeFromSolved`, `Rewards.claim`).
 - Forfeit can be triggered by anyone after `RESPONSE_TIMEOUT` (1 day). This is
   intentional — it is the time guard, not a discretionary action.

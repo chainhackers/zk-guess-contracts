@@ -71,19 +71,19 @@ contract SettleAllTest is Test {
         game.pause();
     }
 
-    /// @dev Drive a forfeited puzzle past CLAIM_TIMEOUT and pause.
-    function _forfeitedPaused(address[] memory guessers, uint256[] memory stakes, uint256 bounty)
+    /// @dev Drive a forfeited puzzle past CLAIM_TIMEOUT and pause. All guessers submit at
+    ///      the same `stake`, which is also the puzzle's `stakeRequired` (uniform stake is
+    ///      sufficient for the settlement scenarios this helper drives).
+    function _forfeitedPaused(address[] memory guessers, uint256 stake, uint256 bounty)
         internal
         returns (uint256 puzzleId)
     {
-        require(guessers.length == stakes.length, "len");
-
         vm.prank(creator);
-        puzzleId = game.createPuzzle{value: bounty}(commitment, bounty, 0.001 ether, 100);
+        puzzleId = game.createPuzzle{value: bounty}(commitment, bounty, stake, 100);
 
         for (uint256 i; i < guessers.length; i++) {
             vm.prank(guessers[i]);
-            game.submitGuess{value: stakes[i]}(puzzleId, i + 1);
+            game.submitGuess{value: stake}(puzzleId, i + 1);
         }
 
         vm.warp(block.timestamp + game.RESPONSE_TIMEOUT() + 1);
@@ -268,10 +268,7 @@ contract SettleAllTest is Test {
         for (uint256 i; i < 3; i++) {
             vm.deal(guessers[i], 1 ether);
         }
-        uint256[] memory stakes = new uint256[](3);
-        stakes[0] = stakes[1] = stakes[2] = 0.001 ether;
-
-        _forfeitedPaused(guessers, stakes, 0.0001 ether);
+        _forfeitedPaused(guessers, 0.001 ether, 0.0001 ether);
 
         // _forfeitedPaused already swept the unclaimed bounty to treasury.
         assertEq(address(treasury).balance, 0.0001 ether, "bounty swept to treasury before pause");
