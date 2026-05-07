@@ -58,17 +58,24 @@ forge test --match-path test/GuessGame.t.sol
 
 ## Deployed Contracts (Base Mainnet)
 
-v2 — deployed 2026-05-05, block 45605232. Owner (operator) is
+v2.1 — deployed 2026-05-07, block 45686113. Owner (operator) is
 [`0xa3369e05999eC082f54817a0a991916780F8bdC4`](https://basescan.org/address/0xa3369e05999eC082f54817a0a991916780F8bdC4); deployer wallet
 [`0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d`](https://basescan.org/address/0x5A089E9Ca9AB8259d024CFBEe697B975cAea861d)
 holds no admin authority. See [`docs/security/wallet-topology.md`](docs/security/wallet-topology.md).
 
-- **GuessGame (Proxy)**: [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)
-- Implementation: [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)
-- Verifier: [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C)
-- Rewards: [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F) — merkle-distributed rewards pool funded by forfeit collateral
+- **GuessGame (Proxy)**: [`0x6F890B08fa4312135E1b4CF03929f8e389A866B4`](https://basescan.org/address/0x6F890B08fa4312135E1b4CF03929f8e389A866B4)
+- Implementation: [`0x9217A110A5663f8685f0251a5892662b9f0Efb19`](https://basescan.org/address/0x9217A110A5663f8685f0251a5892662b9f0Efb19)
+- Verifier: [`0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9`](https://basescan.org/address/0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9) — built from the [`v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony) phase-2 trusted-setup release
+- Rewards: [`0xE9f7aE2A1E574d47CfD19dfB6B2059a31e127f01`](https://basescan.org/address/0xE9f7aE2A1E574d47CfD19dfB6B2059a31e127f01) — merkle-distributed rewards pool funded by forfeit collateral
 
 ### Previous deployments
+
+v2 launch — deployed 2026-05-05, block 45605232. Superseded by v2.1 because the verifier was built from the dev-build zkey rather than the ceremony-final zkey (see [#46](https://github.com/chainhackers/zk-guess-contracts/issues/46)). Zero usage state, zero ETH; do not interact.
+
+- GuessGame (Proxy): [`0xbA14152f40Df6673f316FD623313377Df6edD88A`](https://basescan.org/address/0xbA14152f40Df6673f316FD623313377Df6edD88A)
+- Implementation: [`0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4`](https://basescan.org/address/0xe9813127Fc5927289966DDBe1B0c36bC5190E0F4)
+- Verifier: [`0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`](https://basescan.org/address/0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C)
+- Rewards: [`0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F`](https://basescan.org/address/0x594A8b4fA394580f02c8C7B6450Fa5859F9b602F)
 
 v1 (to be sealed via `settleAll(...)` as part of the v2 cutover; do not interact):
 

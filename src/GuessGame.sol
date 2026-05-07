@@ -16,7 +16,7 @@ import "./interfaces/IGuessGame.sol";
 /// @dev Implements UUPS upgradeable pattern. Puzzle creators commit to a secret number,
 ///      guessers submit challenges with stakes, creators respond with ZK proofs.
 /// @custom:repository https://github.com/chainhackers/zk-guess-contracts
-/// @custom:circuit-repo https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0
+/// @custom:circuit-repo https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony
 /// @custom:commitment-domain DOMAIN_TAG=6000605569458108169701754207643449997818461959397281845176039583157698733685 (= keccak256("zkguess.v2") mod p(BN254))
 /// @custom:homepage https://zk-guess.chainhackers.xyz
 /// @custom:security-contact security@chainhackers.xyz
@@ -131,8 +131,8 @@ contract GuessGame is IGuessGame, Initializable, UUPSUpgradeable, OwnableUpgrade
 
         emit ProjectMetadata(
             "https://zk-guess.chainhackers.xyz",
-            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2.0.0",
-            "", // vkeyChecksum: filled in after the phase-2 ceremony produces guess_final.zkey
+            "https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony",
+            "2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179", // sha256 of verification_key.json
             "" // auditUrl: filled in after first published audit
         );
     }

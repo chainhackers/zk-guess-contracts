@@ -156,17 +156,17 @@ funding.
   `verification_key.json`, the per-contributor intermediate zkeys, and the
   `snarkjs zkey verify` output are all published at
   [`chainhackers/zk-guess-circuits/releases/tag/v2-ceremony`](https://github.com/chainhackers/zk-guess-circuits/releases/tag/v2-ceremony).
-- The deployed `GuessVerifier` (Base mainnet `0xC6AACD8eAe397a92fA2175Dd0938e3A9c4f3582C`)
+- The deployed `GuessVerifier` (Base mainnet `0x2772322a14Ff01c8df663AD13aaC3dC15aF1EfA9`)
   is the `GuessVerifier.sol` artifact attached to that release. Sourcify match against the
   ceremony release is the sufficient on-chain anchor — anyone can reproduce
   `snarkjs zkey verify generated/guess.r1cs generated/pot15_final.ptau guess_final.zkey`
   to confirm the verifying key.
-- `ProjectMetadata` event is emitted at deploy time with `homepage`, `circuitRepo`,
-  `vkeyChecksum`, `auditUrl` fields. **Known gaps in the v2 launch deploy:**
-  `vkeyChecksum` and `auditUrl` were emitted blank, and `circuitRepo` points at a
-  stale tag (`v2.0.0`) instead of the actual `v2-ceremony` tag — these will be fixed
-  in the next implementation upgrade. The canonical ceremony pointer is in this
-  document and in [`SECURITY.md`](../../SECURITY.md).
+- `ProjectMetadata` event emitted at `initialize` carries the canonical pointers:
+  `homepage = "https://zk-guess.chainhackers.xyz"`, `circuitRepo` pointing at the
+  `v2-ceremony` release URL, `vkeyChecksum` populated with the SHA-256 of
+  `verification_key.json`
+  (`2a0ae13d6d50943e65727831d614882463560b0c19ba789473b87b3c6ffc7179`), `auditUrl`
+  blank pending the Phase G named-firm audit.
 
 ## Reputation pointers
 
