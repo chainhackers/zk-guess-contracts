@@ -170,10 +170,11 @@ funding.
 
 ## Reputation pointers
 
+- Project homepage: https://zk-guess.chainhackers.xyz
+- Blockaid `verifiedProject` filing: submitted 2026-05-07, approved 2026-05-08 — v2.1 contracts confirmed benign, the prior cluster flag (anchored on the v1 monolithic EOA) was modified accordingly. Up to 24h for the change to propagate to all integrations.
 - Farcaster mini-app listing: <!-- TODO: URL once submitted -->
 - boost.xyz campaign: <!-- TODO: URL once active -->
 - ENS pointer: `zkguess.chainhackers.eth` <!-- TODO: confirm registered -->
-- Project homepage: https://zk-guess.chainhackers.xyz
 
 ## Bug bounty / disclosure
 
