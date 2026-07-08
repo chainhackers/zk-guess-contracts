@@ -67,14 +67,14 @@ This is a ZK-based number guessing game implemented in Solidity with on-chain Gr
    - **NEVER EDIT THIS FILE MANUALLY**
    - Generated from ZK circuits in a separate repository
    - Updated via `bun run copy-to-contracts` in the circuits repo
-   - Expects 2 public signals: `[commitment, isCorrect]`
+   - Expects 6 public signals: `[commitment, isCorrect, guess, maxNumber, puzzleId, guesser]` (`puzzleId`/`guesser` are bound into the circuit so a proof can't be replayed across puzzles or front-run)
    - Located in `src/generated/` to indicate it's auto-generated
    - Causes "unreachable code" warnings due to assembly early returns (this is expected)
 
 2. **GuessGame.sol** - Main game logic
    - Inherits from Groth16Verifier for proof verification
    - Manages puzzles, challenges, and prize distribution
-   - Key state mappings: `puzzles`, `challenges`, `challengeToPuzzle`
+   - Key state mappings: `puzzles`, `puzzleChallenges`, plus per-guesser aggregates (`guesserStakeTotal`, `guesserChallengeCount`, `guesserClaimed`)
 
 3. **IGuessGame.sol** - Interface defining all structures and functions
    - Defines `Puzzle` and `Challenge` structs
@@ -82,22 +82,24 @@ This is a ZK-based number guessing game implemented in Solidity with on-chain Gr
 
 ### Game Flow
 
-1. **Puzzle Creation**: Creator posts a commitment to a secret number with initial bounty
-2. **Guess Submission**: Players submit guesses with required stake
-3. **Challenge Response**: Creator provides ZK proof showing if guess is correct
-4. **Prize Distribution**: 
-   - Correct guess: Player wins bounty + all stakes
-   - Incorrect guess: Player's stake added to bounty
+1. **Puzzle Creation**: Creator posts a commitment to a secret number with a fixed bounty (`createPuzzle`, `msg.value = bounty + collateral`)
+2. **Guess Submission**: Players submit guesses, each with a required stake (escrowed as a refundable deposit)
+3. **Challenge Response**: Creator provides a ZK proof showing whether the guess is correct
+4. **Prize Distribution**:
+   - Correct guess: the winning guesser is paid the bounty + their own stake back directly; every other pending guesser claims their stake via `claimStakeFromSolved`, and the creator's collateral is credited back to them — both land in an internal `balances[...]` entry pulled out with `withdraw()`
+   - Incorrect guess: the guesser's stake is refunded directly (a `call`) when the creator responds — the bounty is fixed and never grows
+   - Forfeit (creator misses `RESPONSE_TIMEOUT`): collateral is slashed to the Rewards treasury; each pending guesser claims their stake + a pro-rata share of the bounty via `claimFromForfeited` (credited to `balances[...]`, withdrawn with `withdraw()`)
 
 ### Key Implementation Details
 
-- Minimum bounty: 0.0001 ether (MIN_BOUNTY constant)
+- Minimum bounty: 0.0001 ether (`MIN_BOUNTY`); minimum stake: 0.00001 ether (`MIN_STAKE`)
+- Timeouts: `RESPONSE_TIMEOUT` / `CANCEL_TIMEOUT` = 1 day, `CLAIM_TIMEOUT` = 90 days (after which unclaimed forfeited bounty **can be swept** to Rewards by anyone via `sweepStaleBounty`)
 - Creator never reveals the actual secret number
 - ZK proofs verify both knowledge of secret and correctness of guess
-- Bounty grows by configurable percentage from failed guesses
+- The bounty is **fixed** at creation and never grows; a wrong guess costs the guesser nothing but gas (stake refunded in full)
 - Access control ensures only puzzle creator can respond to challenges
 - **IMPORTANT**: Cannot use `address(this).balance` for prize calculations as the contract holds funds for multiple puzzles
-- Must track each puzzle's funds separately using state variables (bounty, totalStaked, creatorReward)
+- Must track each puzzle's funds separately: `bounty` and `collateral` live in the `Puzzle` struct, and per-guesser accounting in the `guesserStakeTotal` (staked amount) / `guesserChallengeCount` (pending-challenge count) mappings (there is **no** `totalStaked` or `creatorReward` — the bounty is fixed)
 
 ## Upgradeability Considerations
 
