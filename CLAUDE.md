@@ -86,20 +86,20 @@ This is a ZK-based number guessing game implemented in Solidity with on-chain Gr
 2. **Guess Submission**: Players submit guesses, each with a required stake (escrowed as a refundable deposit)
 3. **Challenge Response**: Creator provides a ZK proof showing whether the guess is correct
 4. **Prize Distribution**:
-   - Correct guess: the winning guesser takes the bounty + their own stake back; every other pending guesser reclaims their stake via `claimStakeFromSolved`; the creator's collateral is returned
-   - Incorrect guess: the guesser's stake is refunded in full when the creator responds — the bounty is fixed and never grows
-   - Forfeit (creator misses `RESPONSE_TIMEOUT`): collateral is slashed to the Rewards treasury; each pending guesser reclaims their stake + a pro-rata share of the bounty via `claimFromForfeited`
+   - Correct guess: the winning guesser is paid the bounty + their own stake back directly; every other pending guesser claims their stake via `claimStakeFromSolved`, and the creator's collateral is credited back to them — both land in an internal `balances[...]` entry pulled out with `withdraw()`
+   - Incorrect guess: the guesser's stake is refunded directly (a `call`) when the creator responds — the bounty is fixed and never grows
+   - Forfeit (creator misses `RESPONSE_TIMEOUT`): collateral is slashed to the Rewards treasury; each pending guesser claims their stake + a pro-rata share of the bounty via `claimFromForfeited` (credited to `balances[...]`, withdrawn with `withdraw()`)
 
 ### Key Implementation Details
 
 - Minimum bounty: 0.0001 ether (`MIN_BOUNTY`); minimum stake: 0.00001 ether (`MIN_STAKE`)
-- Timeouts: `RESPONSE_TIMEOUT` / `CANCEL_TIMEOUT` = 1 day, `CLAIM_TIMEOUT` = 90 days (stale forfeited bounty is swept to Rewards after this)
+- Timeouts: `RESPONSE_TIMEOUT` / `CANCEL_TIMEOUT` = 1 day, `CLAIM_TIMEOUT` = 90 days (after which unclaimed forfeited bounty **can be swept** to Rewards by anyone via `sweepStaleBounty`)
 - Creator never reveals the actual secret number
 - ZK proofs verify both knowledge of secret and correctness of guess
 - The bounty is **fixed** at creation and never grows; a wrong guess costs the guesser nothing but gas (stake refunded in full)
 - Access control ensures only puzzle creator can respond to challenges
 - **IMPORTANT**: Cannot use `address(this).balance` for prize calculations as the contract holds funds for multiple puzzles
-- Must track each puzzle's funds separately: `bounty` and `collateral` live in the `Puzzle` struct, and per-guesser stakes in the `guesserStakeTotal` / `guesserChallengeCount` mappings (there is **no** `totalStaked` or `creatorReward` — the bounty is fixed)
+- Must track each puzzle's funds separately: `bounty` and `collateral` live in the `Puzzle` struct, and per-guesser accounting in the `guesserStakeTotal` (staked amount) / `guesserChallengeCount` (pending-challenge count) mappings (there is **no** `totalStaked` or `creatorReward` — the bounty is fixed)
 
 ## Upgradeability Considerations
 
